@@ -32,8 +32,10 @@ impl<'ctx, 'src> Env<'ctx, 'src> {
         self.local.insert(name, value);
     }
 
-    pub fn get_local(&self, name: &String) -> Option<&ast::BV<'ctx>> {
-        self.local.get(name)
+    pub fn get_local(&self, name: &String) -> Option<ast::BV<'ctx>> {
+        // ast::BV should be an owned object modeled on a C++
+        // smart pointer. Hence the clone here is cheap
+        self.local.get(name).cloned()
     }
 
     // TODO: Requires a stack of hash maps.

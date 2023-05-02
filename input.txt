@@ -1,6 +1,6 @@
 export function w $myfunc(w %a) {
 @start
-	%b =w add %a, %a
+	%b =w add %a, 23
 	%c =w add %a, %b
 	%d =w add %b, %c
 	hlt

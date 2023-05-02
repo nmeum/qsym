@@ -53,11 +53,26 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         }
     }
 
-    fn get_value(&self, value: &Value) -> Option<&ast::BV<'ctx>> {
+    fn get_const(&self, constant: &Const) -> ast::BV<'ctx> {
+        match constant {
+            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, 32),
+            Const::Global(s) => panic!("global variables not supported"),
+            Const::SFP(_) => panic!("single precision floating points not supported"),
+            Const::DFP(_) => panic!("double precision floating points not supported"),
+        }
+    }
+
+    fn get_dyn_const(&self, dconst: &DynConst) -> ast::BV<'ctx> {
+        match dconst {
+            DynConst::Const(c)  => self.get_const(c),
+            DynConst::Thread(_) => panic!("thread-local constants not supported"),
+        }
+    }
+
+    fn get_value(&self, value: &Value) -> Option<ast::BV<'ctx>> {
         match value {
             Value::LocalVar(var) => self.env.get_local(var),
-            Value::GlobalVar(_) => panic!("not implemented"),
-            Value::Const(_) => panic!("not implemented"),
+            Value::Const(dconst) => Some(self.get_dyn_const(dconst)),
         }
     }
 
@@ -66,7 +81,7 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
             Instr::Add(v1, v2) => {
                 let bv1 = self.get_value(v1)?;
                 let bv2 = self.get_value(v2)?;
-                Some(bv1.bvadd(bv2))
+                Some(bv1.bvadd(&bv2))
             }
         }
     }
