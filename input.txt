@@ -1,0 +1,5 @@
+export function w $addbyte(w %a) {
+@start
+	%c =w add %a, %a
+	hlt
+}
