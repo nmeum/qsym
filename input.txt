@@ -1,5 +1,7 @@
-export function w $addbyte(w %a) {
+export function w $myfunc(w %a) {
 @start
-	%c =w add %a, %a
+	%b =w add %a, %a
+	%c =w add %a, %b
+	%d =w add %b, %c
 	hlt
 }
