@@ -1,3 +1,4 @@
+use qbe_reader::Definition;
 use qbe_reader::types::*;
 use std::collections::HashMap;
 use z3::ast;
@@ -19,10 +20,10 @@ pub struct Interpreter<'ctx, 'src> {
 impl<'ctx, 'src> Interpreter<'ctx, 'src> {
     pub fn new(
         ctx: &'ctx Context,
-        source: &'src Vec<qbe_reader::Definition>,
+        source: &'src Vec<Definition>,
     ) -> Interpreter<'ctx, 'src> {
         let globals = source.iter().filter_map(|x| match x {
-            qbe_reader::Definition::Func(f) => Some((f.name.clone(), GlobalValue::Func(f))),
+            Definition::Func(f) => Some((f.name.clone(), GlobalValue::Func(f))),
             _ => None, // TODO: Global data declarations
         });
 
