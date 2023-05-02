@@ -55,8 +55,8 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     fn get_const(&self, constant: &Const) -> ast::BV<'ctx> {
         match constant {
-            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, 32),
-            Const::Global(s) => panic!("global variables not supported"),
+            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, 64),
+            Const::Global(_) => panic!("global variables not supported"),
             Const::SFP(_) => panic!("single precision floating points not supported"),
             Const::DFP(_) => panic!("double precision floating points not supported"),
         }
@@ -64,23 +64,36 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     fn get_dyn_const(&self, dconst: &DynConst) -> ast::BV<'ctx> {
         match dconst {
-            DynConst::Const(c)  => self.get_const(c),
+            DynConst::Const(c) => self.get_const(c),
             DynConst::Thread(_) => panic!("thread-local constants not supported"),
         }
     }
 
-    fn get_value(&self, value: &Value) -> Option<ast::BV<'ctx>> {
-        match value {
+    fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Option<ast::BV<'ctx>> {
+        let bv = match value {
             Value::LocalVar(var) => self.env.get_local(var),
             Value::Const(dconst) => Some(self.get_dyn_const(dconst)),
+        }?;
+
+        // See https://c9x.me/compile/doc/il-v1.1.html#Subtyping
+        if let Some(x) = dest_ty {
+            if x == BaseType::Word && bv.get_size() == 64 {
+                let lsb = bv.extract(31, 0); // XXX
+                assert!(lsb.get_size() == 32);
+                return Some(lsb);
+            } else if x == BaseType::Word && bv.get_size() != 32 {
+                return None; // TODO: Error message
+            }
         }
+
+        Some(bv)
     }
 
-    fn exec_inst(&self, inst: &Instr) -> Option<ast::BV<'ctx>> {
+    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Option<ast::BV<'ctx>> {
         match inst {
             Instr::Add(v1, v2) => {
-                let bv1 = self.get_value(v1)?;
-                let bv2 = self.get_value(v2)?;
+                let bv1 = self.get_value(dest_ty, v1)?;
+                let bv2 = self.get_value(dest_ty, v2)?;
                 Some(bv1.bvadd(&bv2))
             }
         }
@@ -89,8 +102,7 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
     fn exec_stat(&mut self, stat: &Statement) -> Option<()> {
         match stat {
             Statement::Assign(dest, base, inst) => {
-                // TODO: Implement subtyping for base
-                let result = self.exec_inst(&inst)?;
+                let result = self.exec_inst(Some(*base), &inst)?;
                 self.env.add_local(dest.to_string(), result);
             }
         }
