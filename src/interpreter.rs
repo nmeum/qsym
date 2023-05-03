@@ -3,6 +3,7 @@ use qbe_reader::Definition;
 use std::collections::HashMap;
 use std::process::exit;
 use z3::ast;
+use z3::ast::Ast;
 use z3::Context;
 
 use crate::environment::*;
@@ -16,6 +17,7 @@ const LONG_SIZE: u32 = 64;
 pub struct Interpreter<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
     env: Env<'ctx, 'src>,
+    solver: z3::Solver<'ctx>,
 }
 
 impl<'ctx, 'src> Interpreter<'ctx, 'src> {
@@ -28,6 +30,7 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         Interpreter {
             ctx: ctx,
             env: Env::new(HashMap::from_iter(globals)),
+            solver: z3::Solver::new(&ctx),
         }
     }
 
@@ -124,8 +127,20 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
                 .env
                 .get_block(label)
                 .ok_or(Error::UnknownLabel(label.to_string())),
-            JumpInstr::Jnz(_value, _true, _false) => {
-                panic!("Conditional jumps not implemented");
+            JumpInstr::Jnz(value, _true, _false) => {
+                let bv = self.get_value(None, value)?;
+
+                let can_be_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
+                if let z3::SatResult::Sat = self.solver.check_assumptions(&[can_be_zero]) {
+                    println!("BV {} can be zero", bv);
+                }
+
+                let can_be_non_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size())).not();
+                if let z3::SatResult::Sat = self.solver.check_assumptions(&[can_be_non_zero]) {
+                    println!("BV {} can be non-zero", bv);
+                }
+
+                panic!("Jnz not fully implemented");
             }
             JumpInstr::Return(_) => {
                 panic!("Return instruction not implemented");
