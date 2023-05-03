@@ -1,4 +1,5 @@
 mod environment;
+mod error;
 mod interpreter;
 
 use qbe_reader as qbe;

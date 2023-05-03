@@ -1,9 +1,10 @@
+use qbe_reader::types::*;
+use std::collections::HashMap;
 use z3::ast;
 use z3::Context;
 
 use crate::environment::*;
-use qbe_reader::types::*;
-use std::collections::HashMap;
+use crate::error::*;
 
 pub struct Interpreter<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
@@ -69,37 +70,38 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         }
     }
 
-    fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Option<ast::BV<'ctx>> {
+    fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Result<ast::BV<'ctx>, Error> {
         let bv = match value {
             Value::LocalVar(var) => self.env.get_local(var),
             Value::Const(dconst) => Some(self.get_dyn_const(dconst)),
-        }?;
+        }
+        .ok_or(Error::UnknownVariable)?;
 
         // See https://c9x.me/compile/doc/il-v1.1.html#Subtyping
         if let Some(x) = dest_ty {
             if x == BaseType::Word && bv.get_size() == 64 {
                 let lsb = bv.extract(31, 0); // XXX
                 assert!(lsb.get_size() == 32);
-                return Some(lsb);
+                return Ok(lsb);
             } else if x == BaseType::Word && bv.get_size() != 32 {
-                return None; // TODO: Error message
+                return Err(Error::InvalidSubtyping);
             }
         }
 
-        Some(bv)
+        Ok(bv)
     }
 
-    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Option<ast::BV<'ctx>> {
+    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<ast::BV<'ctx>, Error> {
         match inst {
             Instr::Add(v1, v2) => {
                 let bv1 = self.get_value(dest_ty, v1)?;
                 let bv2 = self.get_value(dest_ty, v2)?;
-                Some(bv1.bvadd(&bv2))
+                Ok(bv1.bvadd(&bv2))
             }
         }
     }
 
-    fn exec_stat(&mut self, stat: &Statement) -> Option<()> {
+    fn exec_stat(&mut self, stat: &Statement) -> Result<(), Error> {
         match stat {
             Statement::Assign(dest, base, inst) => {
                 let result = self.exec_inst(Some(*base), &inst)?;
@@ -107,25 +109,26 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
             }
         }
 
-        Some(())
+        Ok(())
     }
 
-    pub fn exec_func(&mut self, name: &String) -> Option<u32> {
-        let func = self.env.get_func(name)?;
+    pub fn exec_func(&mut self, name: &String) -> Result<u32, Error> {
+        let func = self.env.get_func(name).ok_or(Error::UnknownFunction)?;
+
         for param in func.params.iter() {
             let (name, bv) = self.get_func_param(func, param);
             self.env.add_local(name, bv);
         }
 
-        let mut num_blocks = 0;
+        let mut num_inst = 0;
         for block in func.body.iter() {
-            num_blocks += 1;
             for stat in block.inst.iter() {
                 self.exec_stat(stat)?;
+                num_inst += 1;
             }
         }
 
-        Some(num_blocks)
+        Ok(num_inst)
     }
 
     // XXX: Just a hack to see stuff right now.
