@@ -1,6 +1,6 @@
 #[derive(Debug)]
 pub enum Error {
-    UnknownFunction,
-    UnknownVariable,
+    UnknownFunction(String),
+    UnknownVariable(String),
     InvalidSubtyping,
 }

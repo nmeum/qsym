@@ -72,10 +72,12 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Result<ast::BV<'ctx>, Error> {
         let bv = match value {
-            Value::LocalVar(var) => self.env.get_local(var),
-            Value::Const(dconst) => Some(self.get_dyn_const(dconst)),
-        }
-        .ok_or(Error::UnknownVariable)?;
+            Value::LocalVar(var) => self
+                .env
+                .get_local(var)
+                .ok_or(Error::UnknownVariable(var.to_string())),
+            Value::Const(dconst) => Ok(self.get_dyn_const(dconst)),
+        }?;
 
         // See https://c9x.me/compile/doc/il-v1.1.html#Subtyping
         if let Some(x) = dest_ty {
@@ -113,7 +115,10 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
     }
 
     pub fn exec_func(&mut self, name: &String) -> Result<u32, Error> {
-        let func = self.env.get_func(name).ok_or(Error::UnknownFunction)?;
+        let func = self
+            .env
+            .get_func(name)
+            .ok_or(Error::UnknownFunction(name.to_string()))?;
 
         for param in func.params.iter() {
             let (name, bv) = self.get_func_param(func, param);
