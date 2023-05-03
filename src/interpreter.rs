@@ -6,6 +6,11 @@ use z3::Context;
 use crate::environment::*;
 use crate::error::*;
 
+//const BYTE_SIZE: u32 = 8;
+//const HALF_SIZE: u32 = 16;
+const WORD_SIZE: u32 = 32;
+const LONG_SIZE: u32 = 64;
+
 pub struct Interpreter<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
     env: Env<'ctx, 'src>,
@@ -29,8 +34,8 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     fn get_base_type(&self, name: String, ty: &BaseType) -> ast::BV<'ctx> {
         match ty {
-            BaseType::Word => ast::BV::new_const(self.ctx, name, 32),
-            BaseType::Long => ast::BV::new_const(self.ctx, name, 64),
+            BaseType::Word => ast::BV::new_const(self.ctx, name, WORD_SIZE),
+            BaseType::Long => ast::BV::new_const(self.ctx, name, LONG_SIZE),
             BaseType::Single => panic!("singles not supported"),
             BaseType::Double => panic!("doubles not supported"),
         }
@@ -56,7 +61,7 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     fn get_const(&self, constant: &Const) -> ast::BV<'ctx> {
         match constant {
-            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, 64),
+            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, LONG_SIZE),
             Const::Global(_) => panic!("global variables not supported"),
             Const::SFP(_) => panic!("single precision floating points not supported"),
             Const::DFP(_) => panic!("double precision floating points not supported"),
