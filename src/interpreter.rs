@@ -1,6 +1,7 @@
-use qbe_reader::Definition;
 use qbe_reader::types::*;
+use qbe_reader::Definition;
 use std::collections::HashMap;
+use std::process::exit;
 use z3::ast;
 use z3::Context;
 
@@ -18,10 +19,7 @@ pub struct Interpreter<'ctx, 'src> {
 }
 
 impl<'ctx, 'src> Interpreter<'ctx, 'src> {
-    pub fn new(
-        ctx: &'ctx Context,
-        source: &'src Vec<Definition>,
-    ) -> Interpreter<'ctx, 'src> {
+    pub fn new(ctx: &'ctx Context, source: &'src Vec<Definition>) -> Interpreter<'ctx, 'src> {
         let globals = source.iter().filter_map(|x| match x {
             Definition::Func(f) => Some((f.name.clone(), GlobalValue::Func(f))),
             _ => None, // TODO: Global data declarations
@@ -120,10 +118,39 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         Ok(())
     }
 
-    pub fn exec_func(&mut self, name: &String) -> Result<u32, Error> {
+    fn exec_jump(&self, instr: &JumpInstr) -> Result<&'src Block, Error> {
+        match instr {
+            JumpInstr::Jump(label) => self
+                .env
+                .get_block(label)
+                .ok_or(Error::UnknownLabel(label.to_string())),
+            JumpInstr::Jnz(_value, _true, _false) => {
+                panic!("Conditional jumps not implemented");
+            }
+            JumpInstr::Return(_) => {
+                panic!("Return instruction not implemented");
+            }
+            JumpInstr::Halt => {
+                println!("Halting executing");
+                self.dump(); // XXX
+                exit(0);
+            }
+        }
+    }
+
+    fn exec_block(&mut self, block: &Block) -> Result<(), Error> {
+        for stat in block.inst.iter() {
+            self.exec_stat(stat)?;
+        }
+
+        let target = self.exec_jump(&block.jump)?;
+        self.exec_block(target)
+    }
+
+    pub fn exec_func(&mut self, name: &String) -> Result<(), Error> {
         let func = self
             .env
-            .get_func(name)
+            .set_func(name)
             .ok_or(Error::UnknownFunction(name.to_string()))?;
 
         for param in func.params.iter() {
@@ -131,15 +158,11 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
             self.env.add_local(name, bv);
         }
 
-        let mut num_inst = 0;
         for block in func.body.iter() {
-            for stat in block.inst.iter() {
-                self.exec_stat(stat)?;
-                num_inst += 1;
-            }
+            self.exec_block(block)?;
         }
 
-        Ok(num_inst)
+        Ok(())
     }
 
     // XXX: Just a hack to see stuff right now.

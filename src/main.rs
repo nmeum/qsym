@@ -14,8 +14,6 @@ fn run_qbe(fname: &str, source: Vec<qbe::Definition>) {
 
     let mut interp = Interpreter::new(&ctx, &source);
     interp.exec_func(&fname.to_string()).unwrap();
-
-    interp.dump();
 }
 
 fn main() {

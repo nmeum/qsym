@@ -9,6 +9,7 @@ pub enum GlobalValue<'ctx, 'src> {
 
 pub struct Env<'ctx, 'src> {
     global: HashMap<String, GlobalValue<'ctx, 'src>>,
+    labels: Option<HashMap<&'src str, &'src qbe::types::Block>>,
     pub local: HashMap<String, ast::BV<'ctx>>,
 }
 
@@ -16,15 +17,28 @@ impl<'ctx, 'src> Env<'ctx, 'src> {
     pub fn new(globals: HashMap<String, GlobalValue<'ctx, 'src>>) -> Env<'ctx, 'src> {
         Env {
             global: globals,
+            labels: None,
             local: HashMap::new(),
         }
     }
 
-    pub fn get_func(&self, name: &String) -> Option<&'src qbe::types::FuncDef> {
+    pub fn set_func(&mut self, name: &String) -> Option<&'src qbe::types::FuncDef> {
         let elem = self.global.get(name)?;
-        match elem {
+        let func = match elem {
             GlobalValue::Func(x) => Some(x),
             GlobalValue::Data(_) => None,
+        }?;
+
+        let blocks = func.body.iter().map(|blk| (blk.label.as_str(), blk));
+        self.labels = Some(HashMap::from_iter(blocks));
+
+        Some(func)
+    }
+
+    pub fn get_block(&self, name: &str) -> Option<&'src qbe::types::Block> {
+        match &self.labels {
+            Some(m) => m.get(name).map(|b| *b),
+            None => None,
         }
     }
 
