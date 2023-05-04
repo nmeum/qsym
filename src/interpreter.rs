@@ -242,6 +242,13 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
 
     // XXX: Just a hack to see stuff right now.
     pub fn dump(&self) {
+        self.solver.check();
+        let model = self.solver.get_model();
+        match model {
+            None => println!("no model"),
+            Some(m) => print!("model: {}", m),
+        };
+
         for (key, value) in self.env.local.iter() {
             println!("\t{} = {}", key, value.simplify());
         }
