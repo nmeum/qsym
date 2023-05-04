@@ -230,6 +230,7 @@ dependencies = [
 name = "qsym"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "qbe_reader",
  "z3",
 ]

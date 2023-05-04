@@ -1,3 +1,4 @@
+use libc::{c_int, fork, waitpid};
 use qbe_reader::types::*;
 use qbe_reader::Definition;
 use std::collections::HashMap;
@@ -18,6 +19,24 @@ pub struct Interpreter<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
     env: Env<'ctx, 'src>,
     solver: z3::Solver<'ctx>,
+}
+
+struct Path<'ctx, 'src>(Option<z3::ast::Bool<'ctx>>, &'src Block);
+
+impl<'ctx, 'src> Path<'ctx, 'src> {
+    pub fn feasible(&self, solver: &z3::Solver<'ctx>) -> bool {
+        let cond = match &self.0 {
+            Some(x) => x,
+            None => return true,
+        };
+
+        let r = solver.check_assumptions(&[cond.clone()]);
+        match r {
+            z3::SatResult::Unsat => false,
+            z3::SatResult::Sat => true,
+            z3::SatResult::Unknown => panic!("unknown SAT result"),
+        }
+    }
 }
 
 impl<'ctx, 'src> Interpreter<'ctx, 'src> {
@@ -121,36 +140,53 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         Ok(())
     }
 
-    fn exec_jump(&self, instr: &JumpInstr) -> Result<&'src Block, Error> {
+    fn get_block(&self, label: &str) -> Result<&'src Block, Error> {
+        self.env
+            .get_block(label)
+            .ok_or(Error::UnknownLabel(label.to_string()))
+    }
+
+    fn exec_jump(
+        &self,
+        instr: &JumpInstr,
+    ) -> Result<(Path<'ctx, 'src>, Option<Path<'ctx, 'src>>), Error> {
         match instr {
-            JumpInstr::Jump(label) => self
-                .env
-                .get_block(label)
-                .ok_or(Error::UnknownLabel(label.to_string())),
-            JumpInstr::Jnz(value, _true, _false) => {
-                let bv = self.get_value(None, value)?;
+            JumpInstr::Jump(label) => Ok((Path(None, self.get_block(label)?), None)),
+            JumpInstr::Jnz(value, nzero_label, zero_label) => {
+                let bv = self.get_value(Some(BaseType::Word), value)?;
+                let is_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
 
-                let can_be_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
-                if let z3::SatResult::Sat = self.solver.check_assumptions(&[can_be_zero]) {
-                    println!("BV {} can be zero", bv);
+                let nzero_path = Path(Some(is_zero.clone().not()), self.get_block(nzero_label)?);
+                let zero_path = Path(Some(is_zero), self.get_block(zero_label)?);
+
+                let zero_feasible = zero_path.feasible(&self.solver);
+                if zero_feasible && nzero_path.feasible(&self.solver) {
+                    Ok((nzero_path, Some(zero_path)))
+                } else if zero_feasible {
+                    Ok((zero_path, None))
+                } else {
+                    // non-zero
+                    Ok((nzero_path, None))
                 }
-
-                let can_be_non_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size())).not();
-                if let z3::SatResult::Sat = self.solver.check_assumptions(&[can_be_non_zero]) {
-                    println!("BV {} can be non-zero", bv);
-                }
-
-                panic!("Jnz not fully implemented");
             }
             JumpInstr::Return(_) => {
                 panic!("Return instruction not implemented");
             }
             JumpInstr::Halt => {
                 println!("Halting executing");
-                self.dump(); // XXX
-                exit(0);
+                Err(Error::HaltExecution)
             }
         }
+    }
+
+    #[inline]
+    fn explore_path(&mut self, path: &Path) -> Result<(), Error> {
+        println!("Exploring path for label {}", path.1.label);
+
+        if let Some(c) = &path.0 {
+            self.solver.assert(c);
+        }
+        self.exec_block(path.1)
     }
 
     fn exec_block(&mut self, block: &Block) -> Result<(), Error> {
@@ -158,8 +194,25 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
             self.exec_stat(stat)?;
         }
 
-        let target = self.exec_jump(&block.jump)?;
-        self.exec_block(target)
+        let targets = self.exec_jump(&block.jump)?;
+        match targets {
+            (path1, Some(path2)) => unsafe {
+                let pid = fork();
+                match pid {
+                    -1 => Err(Error::ForkFailed),
+                    0 => self.explore_path(&path1),
+                    _ => {
+                        let mut status = 0 as c_int;
+                        if waitpid(pid, &mut status as *mut c_int, 0) == -1 {
+                            Err(Error::WaitpidFailed)
+                        } else {
+                            self.explore_path(&path2)
+                        }
+                    }
+                }
+            },
+            (path, None) => self.explore_path(&path),
+        }
     }
 
     pub fn exec_func(&mut self, name: &String) -> Result<(), Error> {
@@ -174,7 +227,14 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
         }
 
         for block in func.body.iter() {
-            self.exec_block(block)?;
+            match self.exec_block(block) {
+                Err(Error::HaltExecution) => {
+                    self.dump();
+                    exit(0)
+                }
+                Err(x) => return Err(x),
+                Ok(x) => x,
+            }
         }
 
         Ok(())
@@ -183,7 +243,7 @@ impl<'ctx, 'src> Interpreter<'ctx, 'src> {
     // XXX: Just a hack to see stuff right now.
     pub fn dump(&self) {
         for (key, value) in self.env.local.iter() {
-            println!("{} = {}", key, value);
+            println!("\t{} = {}", key, value.simplify());
         }
     }
 }

@@ -1,7 +1,11 @@
 export function w $myfunc(w %a) {
 @start
-	%b =w add %a, 23
-	%c =w add %a, %b
-	%d =w add %b, %c
-	hlt
+        %a =w add 0, 1
+        jnz %a, @end1, @end2
+@end1
+        %exit =w add 0, 1
+        hlt
+@end2
+        %exit =w add 0, 2
+        hlt
 }
