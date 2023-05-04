@@ -7,15 +7,15 @@ pub enum GlobalValue<'ctx, 'src> {
     Data(ast::BV<'ctx>),
 }
 
-pub struct Env<'ctx, 'src> {
+pub struct State<'ctx, 'src> {
     global: HashMap<String, GlobalValue<'ctx, 'src>>,
     labels: Option<HashMap<&'src str, &'src qbe::types::Block>>,
     pub local: HashMap<String, ast::BV<'ctx>>,
 }
 
-impl<'ctx, 'src> Env<'ctx, 'src> {
-    pub fn new(globals: HashMap<String, GlobalValue<'ctx, 'src>>) -> Env<'ctx, 'src> {
-        Env {
+impl<'ctx, 'src> State<'ctx, 'src> {
+    pub fn new(globals: HashMap<String, GlobalValue<'ctx, 'src>>) -> State<'ctx, 'src> {
+        State {
             global: globals,
             labels: None,
             local: HashMap::new(),

@@ -1,19 +1,19 @@
-mod environment;
+mod state;
 mod error;
-mod interpreter;
+mod interp;
 
 use qbe_reader as qbe;
 use std::env;
 use z3::{Config, Context};
 
-use interpreter::*;
+use interp::*;
 
 fn run_qbe(fname: &str, source: Vec<qbe::Definition>) {
     let mut cfg = Config::new();
     cfg.set_model_generation(true);
     let ctx = Context::new(&cfg);
 
-    let mut interp = Interpreter::new(&ctx, &source);
+    let mut interp = Interp::new(&ctx, &source);
     interp.exec_func(&fname.to_string()).unwrap();
 }
 

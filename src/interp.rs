@@ -7,7 +7,7 @@ use z3::ast;
 use z3::ast::Ast;
 use z3::Context;
 
-use crate::environment::*;
+use crate::state::*;
 use crate::error::*;
 
 //const BYTE_SIZE: u32 = 8;
@@ -15,9 +15,9 @@ use crate::error::*;
 const WORD_SIZE: u32 = 32;
 const LONG_SIZE: u32 = 64;
 
-pub struct Interpreter<'ctx, 'src> {
+pub struct Interp<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
-    env: Env<'ctx, 'src>,
+    env: State<'ctx, 'src>,
     solver: z3::Solver<'ctx>,
 }
 
@@ -39,16 +39,16 @@ impl<'ctx, 'src> Path<'ctx, 'src> {
     }
 }
 
-impl<'ctx, 'src> Interpreter<'ctx, 'src> {
-    pub fn new(ctx: &'ctx Context, source: &'src Vec<Definition>) -> Interpreter<'ctx, 'src> {
+impl<'ctx, 'src> Interp<'ctx, 'src> {
+    pub fn new(ctx: &'ctx Context, source: &'src Vec<Definition>) -> Interp<'ctx, 'src> {
         let globals = source.iter().filter_map(|x| match x {
             Definition::Func(f) => Some((f.name.clone(), GlobalValue::Func(f))),
             _ => None, // TODO: Global data declarations
         });
 
-        Interpreter {
+        Interp {
             ctx: ctx,
-            env: Env::new(HashMap::from_iter(globals)),
+            env: State::new(HashMap::from_iter(globals)),
             solver: z3::Solver::new(&ctx),
         }
     }
