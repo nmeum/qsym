@@ -196,6 +196,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
         let targets = self.exec_jump(&block.jump)?;
         match targets {
+            // For conditional jumps, we fork(3) the entire interpreter process.
+            // This is, obviously, horribly inefficient and will lead to memory
+            // explosion issues for any somewhat complex program. In the future,
+            // the State module should be modified to allow efficient copies of
+            // the state by leveraging a copy-on-write mechanism.
             (path1, Some(path2)) => unsafe {
                 let pid = fork();
                 match pid {
