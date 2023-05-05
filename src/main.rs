@@ -1,6 +1,7 @@
-mod state;
 mod error;
 mod interp;
+mod memory;
+mod state;
 
 use qbe_reader as qbe;
 use std::env;

@@ -1,46 +1,113 @@
-pub struct Memory {
-    buf: Vec<u8>,
+use z3::ast;
+use z3::Context;
+use z3::Sort;
+
+pub struct Memory<'ctx> {
+    ctx: &'ctx Context,
+    pub data: ast::Array<'ctx>,
 }
 
-pub type Addr = usize;
+impl<'ctx> Memory<'ctx> {
+    pub fn new(ctx: &'ctx Context) -> Memory<'ctx> {
+        let ary = ast::Array::new_const(
+            ctx,
+            "memory",
+            &Sort::bitvector(&ctx, 64), // index type
+            &Sort::bitvector(&ctx, 8),  // value type
+        );
 
-impl Memory {
-    pub fn new(size: usize) -> Memory {
         Memory {
-            buf: vec![0; size]
+            ctx: ctx,
+            data: ary,
         }
     }
 
-    pub fn load_byte(&self, addr: Addr) -> u8 {
-        self.buf[addr]
+    pub fn store_byte(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+        self.data = self.data.store(&addr, &value);
     }
 
-    pub fn load_word(&self, addr: Addr) -> u32 {
-        let b0: u32 = self.load_byte(addr).into();
-        let b1: u32 = self.load_byte(addr+1).into();
-        let b2: u32 = self.load_byte(addr+2).into();
-        let b3: u32 = self.load_byte(addr+3).into();
-
-        return b3 | b2 << 8 | b1 << 16 | b0 << 24
+    pub fn load_byte(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        self.data.select(&addr).as_bv().unwrap()
     }
 
-    pub fn store_byte(&mut self, addr: Addr, value: u8) {
-        self.buf[addr] = value;
+    pub fn store_word(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+        // Extract 4 bytes from the bitvector
+        let bytes = (1..=4)
+            .into_iter()
+            .rev()
+            .map(|n| value.extract((n * 8) - 1, (n - 1) * 8));
+
+        // Store each byte in memory
+        bytes.enumerate().for_each(|(n, b)| {
+            assert!(b.get_size() == 8);
+            self.store_byte(addr.bvadd(&ast::BV::from_u64(self.ctx, n as u64, 64)), b)
+        });
+    }
+
+    pub fn load_word(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        // Load 4 bytes from memory
+        let bytes = (0..4)
+            .into_iter()
+            .map(|n| self.load_byte(addr.bvadd(&ast::BV::from_u64(self.ctx, n, 64))));
+
+        // Concat the bytes into a single bitvector
+        bytes.reduce(|acc, e| acc.concat(&e)).unwrap()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use z3::ast::Ast;
+    use z3::Config;
+    use z3::SatResult;
+    use z3::Solver;
 
     #[test]
-    pub fn word() {
-        let mut mem = Memory::new(32);
-        mem.store_byte(0, 0xde);
-        mem.store_byte(1, 0xad);
-        mem.store_byte(2, 0xbe);
-        mem.store_byte(3, 0xef);
+    fn test_byte() {
+        let cfg = Config::new();
+        let ctx = Context::new(&cfg);
+        let mut mem = Memory::new(&ctx);
 
-        assert_eq!(mem.load_word(0), 0xdeadbeef);
+        let addr = ast::BV::from_u64(&ctx, 0x800000, 64);
+        let value = ast::BV::from_u64(&ctx, 0x23, 8);
+
+        mem.store_byte(addr.clone(), value.clone());
+        let loaded = mem.load_byte(addr);
+
+        let solver = Solver::new(&ctx);
+        solver.assert(&loaded._eq(&value));
+        assert_eq!(SatResult::Sat, solver.check());
+    }
+
+    #[test]
+    fn test_word() {
+        let cfg = Config::new();
+        let ctx = Context::new(&cfg);
+        let mut mem = Memory::new(&ctx);
+
+        let addr = ast::BV::from_u64(&ctx, 0x1000, 64);
+        let word = ast::BV::from_u64(&ctx, 0xdeadbeef, 32);
+
+        mem.store_word(addr.clone(), word.clone());
+        let bytes = vec![
+            mem.load_byte(ast::BV::from_u64(&ctx, 0x1000, 64)),
+            mem.load_byte(ast::BV::from_u64(&ctx, 0x1001, 64)),
+            mem.load_byte(ast::BV::from_u64(&ctx, 0x1002, 64)),
+            mem.load_byte(ast::BV::from_u64(&ctx, 0x1003, 64)),
+        ];
+
+        let solver = Solver::new(&ctx);
+        solver.assert(&bytes[0]._eq(&ast::BV::from_u64(&ctx, 0xde, 8)));
+        solver.assert(&bytes[1]._eq(&ast::BV::from_u64(&ctx, 0xad, 8)));
+        solver.assert(&bytes[2]._eq(&ast::BV::from_u64(&ctx, 0xbe, 8)));
+        solver.assert(&bytes[3]._eq(&ast::BV::from_u64(&ctx, 0xef, 8)));
+        assert_eq!(SatResult::Sat, solver.check());
+
+        solver.reset();
+
+        let loaded_word = mem.load_word(addr);
+        solver.assert(&loaded_word._eq(&word));
+        assert_eq!(SatResult::Sat, solver.check());
     }
 }

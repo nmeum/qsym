@@ -1,14 +1,13 @@
 use libc::{c_int, fork, waitpid};
 use qbe_reader::types::*;
 use qbe_reader::Definition;
-use std::collections::HashMap;
 use std::process::exit;
 use z3::ast;
 use z3::ast::Ast;
 use z3::Context;
 
-use crate::state::*;
 use crate::error::*;
+use crate::state::*;
 
 //const BYTE_SIZE: u32 = 8;
 //const HALF_SIZE: u32 = 16;
@@ -17,7 +16,7 @@ const LONG_SIZE: u32 = 64;
 
 pub struct Interp<'ctx, 'src> {
     ctx: &'ctx Context, // The Z3 context
-    env: State<'ctx, 'src>,
+    state: State<'ctx, 'src>,
     solver: z3::Solver<'ctx>,
 }
 
@@ -41,14 +40,9 @@ impl<'ctx, 'src> Path<'ctx, 'src> {
 
 impl<'ctx, 'src> Interp<'ctx, 'src> {
     pub fn new(ctx: &'ctx Context, source: &'src Vec<Definition>) -> Interp<'ctx, 'src> {
-        let globals = source.iter().filter_map(|x| match x {
-            Definition::Func(f) => Some((f.name.clone(), GlobalValue::Func(f))),
-            _ => None, // TODO: Global data declarations
-        });
-
         Interp {
             ctx: ctx,
-            env: State::new(HashMap::from_iter(globals)),
+            state: State::new(&ctx, source),
             solver: z3::Solver::new(&ctx),
         }
     }
@@ -75,21 +69,24 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let ty = self.get_type(func.name.to_string() + ":" + name, ty);
                 (name.to_string(), ty)
             }
-            FuncParam::Env(_) => panic!("env parameters not supported"),
+            FuncParam::Env(_) => panic!("state parameters not supported"),
             FuncParam::Variadic => panic!("varadic functions not supported"),
         }
     }
 
-    fn get_const(&self, constant: &Const) -> ast::BV<'ctx> {
+    fn get_const(&self, constant: &Const) -> Result<ast::BV<'ctx>, Error> {
         match constant {
-            Const::Number(n) => ast::BV::from_i64(self.ctx, *n, LONG_SIZE),
-            Const::Global(_) => panic!("global variables not supported"),
+            Const::Number(n) => Ok(ast::BV::from_i64(self.ctx, *n, LONG_SIZE)),
+            Const::Global(v) => self
+                .state
+                .get_ptr(v)
+                .ok_or(Error::UnknownVariable(v.to_string())),
             Const::SFP(_) => panic!("single precision floating points not supported"),
             Const::DFP(_) => panic!("double precision floating points not supported"),
         }
     }
 
-    fn get_dyn_const(&self, dconst: &DynConst) -> ast::BV<'ctx> {
+    fn get_dyn_const(&self, dconst: &DynConst) -> Result<ast::BV<'ctx>, Error> {
         match dconst {
             DynConst::Const(c) => self.get_const(c),
             DynConst::Thread(_) => panic!("thread-local constants not supported"),
@@ -99,10 +96,10 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Result<ast::BV<'ctx>, Error> {
         let bv = match value {
             Value::LocalVar(var) => self
-                .env
+                .state
                 .get_local(var)
                 .ok_or(Error::UnknownVariable(var.to_string())),
-            Value::Const(dconst) => Ok(self.get_dyn_const(dconst)),
+            Value::Const(dconst) => Ok(self.get_dyn_const(dconst)?),
         }?;
 
         // See https://c9x.me/compile/doc/il-v1.1.html#Subtyping
@@ -126,6 +123,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let bv2 = self.get_value(dest_ty, v2)?;
                 Ok(bv1.bvadd(&bv2))
             }
+            Instr::LoadWord(v) => {
+                let addr = self.get_value(Some(BaseType::Long), v)?;
+                Ok(self.state.mem.load_word(addr.simplify()))
+            }
+            _ => todo!(),
         }
     }
 
@@ -133,7 +135,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         match stat {
             Statement::Assign(dest, base, inst) => {
                 let result = self.exec_inst(Some(*base), &inst)?;
-                self.env.add_local(dest.to_string(), result);
+                self.state.add_local(dest.to_string(), result);
             }
         }
 
@@ -141,7 +143,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     fn get_block(&self, label: &str) -> Result<&'src Block, Error> {
-        self.env
+        self.state
             .get_block(label)
             .ok_or(Error::UnknownLabel(label.to_string()))
     }
@@ -222,13 +224,13 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
     pub fn exec_func(&mut self, name: &String) -> Result<(), Error> {
         let func = self
-            .env
+            .state
             .set_func(name)
             .ok_or(Error::UnknownFunction(name.to_string()))?;
 
         for param in func.params.iter() {
             let (name, bv) = self.get_func_param(func, param);
-            self.env.add_local(name, bv);
+            self.state.add_local(name, bv);
         }
 
         for block in func.body.iter() {
@@ -254,7 +256,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             Some(m) => print!("model: {}", m),
         };
 
-        for (key, value) in self.env.local.iter() {
+        for (key, value) in self.state.local.iter() {
             println!("\t{} = {}", key, value.simplify());
         }
     }
