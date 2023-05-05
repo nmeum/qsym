@@ -23,16 +23,22 @@ impl<'ctx> Memory<'ctx> {
     }
 
     pub fn store_byte(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+        assert!(addr.get_size() == 64);
+        assert!(value.get_size() == 8);
         self.data = self.data.store(&addr, &value);
     }
 
     pub fn load_byte(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        assert!(addr.get_size() == 64);
         self.data.select(&addr).as_bv().unwrap()
     }
 
-    pub fn store_word(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
-        // Extract 4 bytes from the bitvector
-        let bytes = (1..=4)
+    fn store_bitvector(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+        assert!(value.get_size() % 8 == 0);
+        let amount = value.get_size() / 8;
+
+        // Extract nth bytes from the bitvector
+        let bytes = (1..=amount)
             .into_iter()
             .rev()
             .map(|n| value.extract((n * 8) - 1, (n - 1) * 8));
@@ -44,14 +50,23 @@ impl<'ctx> Memory<'ctx> {
         });
     }
 
-    pub fn load_word(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
-        // Load 4 bytes from memory
-        let bytes = (0..4)
+    fn load_bitvector(&self, addr: ast::BV<'ctx>, amount: u64) -> ast::BV<'ctx> {
+        // Load amount bytes from memory
+        let bytes = (0..amount)
             .into_iter()
             .map(|n| self.load_byte(addr.bvadd(&ast::BV::from_u64(self.ctx, n, 64))));
 
         // Concat the bytes into a single bitvector
         bytes.reduce(|acc, e| acc.concat(&e)).unwrap()
+    }
+
+    pub fn store_word(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+        assert!(value.get_size() == 32);
+        self.store_bitvector(addr, value)
+    }
+
+    pub fn load_word(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        self.load_bitvector(addr, 4)
     }
 }
 
