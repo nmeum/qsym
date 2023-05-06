@@ -62,13 +62,13 @@ impl<'ctx> Memory<'ctx> {
 
     pub fn store_string(&mut self, addr: ast::BV<'ctx>, str: &str) -> ast::BV<'ctx> {
         let mut cur_addr = addr;
-        for (i, c) in str.chars().enumerate() {
+        for c in str.chars() {
             let code: u8 = c.try_into().unwrap();
-            cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, i as u64, 64));
             self.store_byte(
                 cur_addr.clone(),
                 ast::BV::from_u64(self.ctx, code.into(), 8),
             );
+            cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, 1, 64));
         }
 
         cur_addr
