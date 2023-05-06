@@ -144,7 +144,10 @@ impl<'ctx, 'src> State<'ctx, 'src> {
                     let size = extty_to_size(ty);
                     let word = ast::BV::from_i64(self.ctx, *n, size);
                     self.mem.store_word(cur_addr.clone(), word);
-                    cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, size as u64, 64));
+
+                    assert!(size % 8 == 0);
+                    let bytes = (size / 8) as u64;
+                    cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, bytes, 64));
                 }
                 Const::SFP(_) => {
                     panic!("single precision floating points not supported")
