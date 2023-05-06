@@ -18,6 +18,8 @@ pub fn extty_to_size(ty: &ExtType) -> u32 {
     }
 }
 
+// TODO: This only reduces the size of the bitvector
+// and does not increase the size of the bitvector.
 pub fn cast_to<'ctx>(ty: &ExtType, bv: ast::BV<'ctx>) -> ast::BV<'ctx> {
     let byte_size = extty_to_size(ty);
     bv.extract(byte_size - 1, 0)

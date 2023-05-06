@@ -80,6 +80,7 @@ impl<'ctx> Memory<'ctx> {
     }
 
     pub fn load_word(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        assert!(addr.get_size() == 64);
         self.load_bitvector(addr, 4)
     }
 }
