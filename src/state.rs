@@ -142,7 +142,8 @@ impl<'ctx, 'src> State<'ctx, 'src> {
             DataItem::Const(c) => match c {
                 Const::Number(n) => {
                     let size = extty_to_size(ty);
-                    ast::BV::from_i64(self.ctx, *n, size);
+                    let word = ast::BV::from_i64(self.ctx, *n, size);
+                    self.mem.store_word(cur_addr.clone(), word);
                     cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, size as u64, 64));
                 }
                 Const::SFP(_) => {
