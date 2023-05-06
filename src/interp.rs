@@ -39,12 +39,16 @@ impl<'ctx, 'src> Path<'ctx, 'src> {
 }
 
 impl<'ctx, 'src> Interp<'ctx, 'src> {
-    pub fn new(ctx: &'ctx Context, source: &'src Vec<Definition>) -> Interp<'ctx, 'src> {
-        Interp {
+    pub fn new(
+        ctx: &'ctx Context,
+        source: &'src Vec<Definition>,
+    ) -> Result<Interp<'ctx, 'src>, Error> {
+        let state = State::new(&ctx, source)?;
+        Ok(Interp {
             ctx: ctx,
-            state: State::new(&ctx, source),
+            state: state,
             solver: z3::Solver::new(&ctx),
-        }
+        })
     }
 
     fn get_base_type(&self, name: String, ty: &BaseType) -> ast::BV<'ctx> {

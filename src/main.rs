@@ -2,6 +2,7 @@ mod error;
 mod interp;
 mod memory;
 mod state;
+mod util;
 
 use qbe_reader as qbe;
 use std::env;
@@ -14,7 +15,7 @@ fn run_qbe(fname: &str, source: Vec<qbe::Definition>) {
     cfg.set_model_generation(true);
     let ctx = Context::new(&cfg);
 
-    let mut interp = Interp::new(&ctx, &source);
+    let mut interp = Interp::new(&ctx, &source).unwrap();
     interp.exec_func(&fname.to_string()).unwrap();
 }
 

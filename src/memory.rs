@@ -33,7 +33,7 @@ impl<'ctx> Memory<'ctx> {
         self.data.select(&addr).as_bv().unwrap()
     }
 
-    fn store_bitvector(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+    pub fn store_bitvector(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
         assert!(value.get_size() % 8 == 0);
         let amount = value.get_size() / 8;
 
@@ -50,7 +50,7 @@ impl<'ctx> Memory<'ctx> {
         });
     }
 
-    fn load_bitvector(&self, addr: ast::BV<'ctx>, amount: u64) -> ast::BV<'ctx> {
+    pub fn load_bitvector(&self, addr: ast::BV<'ctx>, amount: u64) -> ast::BV<'ctx> {
         // Load amount bytes from memory
         let bytes = (0..amount)
             .into_iter()
@@ -58,6 +58,20 @@ impl<'ctx> Memory<'ctx> {
 
         // Concat the bytes into a single bitvector
         bytes.reduce(|acc, e| acc.concat(&e)).unwrap()
+    }
+
+    pub fn store_string(&mut self, addr: ast::BV<'ctx>, str: &str) -> ast::BV<'ctx> {
+        let mut cur_addr = addr;
+        for (i, c) in str.chars().enumerate() {
+            let code: u8 = c.try_into().unwrap();
+            cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, i as u64, 64));
+            self.store_byte(
+                cur_addr.clone(),
+                ast::BV::from_u64(self.ctx, code.into(), 8),
+            );
+        }
+
+        cur_addr
     }
 
     pub fn store_word(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
@@ -92,6 +106,21 @@ mod tests {
 
         let solver = Solver::new(&ctx);
         solver.assert(&loaded._eq(&value));
+        assert_eq!(SatResult::Sat, solver.check());
+    }
+
+    #[test]
+    fn test_string() {
+        let cfg = Config::new();
+        let ctx = Context::new(&cfg);
+        let mut mem = Memory::new(&ctx);
+
+        let addr = ast::BV::from_u64(&ctx, 0x0, 64);
+        mem.store_string(addr, "hello");
+        let loaded = mem.load_byte(ast::BV::from_u64(&ctx, 0x0, 64));
+
+        let solver = Solver::new(&ctx);
+        solver.assert(&loaded._eq(&ast::BV::from_u64(&ctx, 0x68, 8)));
         assert_eq!(SatResult::Sat, solver.check());
     }
 
