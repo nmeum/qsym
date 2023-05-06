@@ -92,48 +92,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         match obj {
             DataObj::DataItem(ty, items) => {
                 for item in items.iter() {
-                    match item {
-                        DataItem::Symbol(name, offset) => {
-                            let mut ptr = cast_to(
-                                ty,
-                                self.get_ptr(name)
-                                    .ok_or(Error::UnknownVariable(name.to_string()))?,
-                            );
-                            if let Some(off) = offset {
-                                let off = ast::BV::from_u64(self.ctx, *off, ptr.get_size());
-                                ptr = ptr.bvadd(&off);
-                            }
-
-                            assert!(ptr.get_size() % 8 == 0);
-                            let bytes = ptr.get_size() / 8;
-
-                            self.mem.store_bitvector(cur_addr.clone(), ptr);
-                            cur_addr =
-                                cur_addr.bvadd(&ast::BV::from_u64(self.ctx, bytes as u64, 64));
-                        }
-                        DataItem::String(str) => {
-                            if *ty != ExtType::Byte {
-                                return Err(Error::UnsupportedStringType);
-                            }
-                            cur_addr = self.mem.store_string(cur_addr, str);
-                        }
-                        // TODO: Reduce code duplication with get_const() from interp.rs
-                        DataItem::Const(c) => match c {
-                            Const::Number(n) => {
-                                let size = extty_to_size(ty);
-                                ast::BV::from_i64(self.ctx, *n, size);
-                                cur_addr =
-                                    cur_addr.bvadd(&ast::BV::from_u64(self.ctx, size as u64, 64));
-                            }
-                            Const::SFP(_) => {
-                                panic!("single precision floating points not supported")
-                            }
-                            Const::DFP(_) => {
-                                panic!("double precision floating points not supported")
-                            }
-                            Const::Global(_) => unreachable!(),
-                        },
-                    }
+                    cur_addr = self.insert_data_item(ty, cur_addr, item)?;
                 }
             }
             DataObj::ZeroFill(n) => {
@@ -143,6 +102,57 @@ impl<'ctx, 'src> State<'ctx, 'src> {
                     self.mem.store_byte(cur_addr.clone(), zero.clone())
                 }
             }
+        }
+
+        Ok(cur_addr)
+    }
+
+    pub fn insert_data_item(
+        &mut self,
+        ty: &ExtType,
+        addr: ast::BV<'ctx>,
+        item: &DataItem,
+    ) -> Result<ast::BV<'ctx>, Error> {
+        let mut cur_addr = addr;
+        match item {
+            DataItem::Symbol(name, offset) => {
+                let mut ptr = cast_to(
+                    ty,
+                    self.get_ptr(name)
+                        .ok_or(Error::UnknownVariable(name.to_string()))?,
+                );
+                if let Some(off) = offset {
+                    let off = ast::BV::from_u64(self.ctx, *off, ptr.get_size());
+                    ptr = ptr.bvadd(&off);
+                }
+
+                assert!(ptr.get_size() % 8 == 0);
+                let bytes = (ptr.get_size() / 8) as u64;
+
+                self.mem.store_bitvector(cur_addr.clone(), ptr);
+                cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, bytes, 64));
+            }
+            DataItem::String(str) => {
+                if *ty != ExtType::Byte {
+                    return Err(Error::UnsupportedStringType);
+                }
+                cur_addr = self.mem.store_string(cur_addr, str);
+            }
+            // TODO: Reduce code duplication with get_const() from interp.rs
+            DataItem::Const(c) => match c {
+                Const::Number(n) => {
+                    let size = extty_to_size(ty);
+                    ast::BV::from_i64(self.ctx, *n, size);
+                    cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, size as u64, 64));
+                }
+                Const::SFP(_) => {
+                    panic!("single precision floating points not supported")
+                }
+                Const::DFP(_) => {
+                    panic!("double precision floating points not supported")
+                }
+                Const::Global(_) => unreachable!(),
+            },
         }
 
         Ok(cur_addr)
