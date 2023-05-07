@@ -7,5 +7,6 @@ pub enum Error {
     InvalidSubtyping,
     ForkFailed,
     WaitpidFailed,
+    InvalidType,
     UnsupportedStringType,
 }

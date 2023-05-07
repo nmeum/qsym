@@ -129,7 +129,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             }
             Instr::LoadWord(v) => {
                 let addr = self.get_value(Some(BaseType::Long), v)?;
-                Ok(self.state.mem.load_word(addr.simplify()))
+                if addr.get_size() != LONG_SIZE {
+                    Err(Error::InvalidType)
+                } else {
+                    Ok(self.state.mem.load_word(addr.simplify()))
+                }
             }
             _ => todo!(),
         }
