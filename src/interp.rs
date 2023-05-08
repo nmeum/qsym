@@ -121,6 +121,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<ast::BV<'ctx>, Error> {
+        // XXX: This instruction simulator assumes that the instructions are
+        // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
             Instr::Add(v1, v2) => {
                 let bv1 = self.get_value(dest_ty, v1)?;
@@ -128,12 +130,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 Ok(bv1.bvadd(&bv2))
             }
             Instr::LoadWord(v) => {
-                let addr = self.get_value(Some(BaseType::Long), v)?;
-                if addr.get_size() != LONG_SIZE {
-                    Err(Error::InvalidType)
-                } else {
-                    Ok(self.state.mem.load_word(addr.simplify()))
-                }
+                let addr = self.get_value(None, v)?;
+                Ok(self.state.mem.load_word(addr.simplify()))
             }
             _ => todo!(),
         }
