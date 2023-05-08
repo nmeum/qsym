@@ -14,6 +14,8 @@ use crate::util::*;
 // Bit pattern used to pretend that we actually store functions
 // in memory (which we don't) cause we don't have an instruction
 // representation. Hence, we just store this pattern instead.
+//
+// TODO: Just store unconstrained symbolic bytes instead.
 const FUNC_PATTERN: u64 = 0xdeadbeef;
 
 struct FuncState<'ctx, 'src> {
