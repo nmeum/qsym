@@ -314,7 +314,6 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         unreachable!();
     }
 
-    // TODO: Reduce code duplication with exec_func
     pub fn exec_symbolic(&mut self, name: &String) -> Result<(), Error> {
         let func = self
             .state
