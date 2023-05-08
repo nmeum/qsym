@@ -1,5 +1,5 @@
 use qbe_reader::types::*;
-use z3::ast;
+use z3::ast::BV;
 
 pub fn basety_to_size(ty: &BaseType) -> u32 {
     match ty {
@@ -20,7 +20,7 @@ pub fn extty_to_size(ty: &ExtType) -> u32 {
 
 // TODO: This only reduces the size of the bitvector
 // and does not increase the size of the bitvector.
-pub fn cast_to<'ctx>(ty: &ExtType, bv: ast::BV<'ctx>) -> ast::BV<'ctx> {
+pub fn cast_to<'ctx>(ty: &ExtType, bv: BV<'ctx>) -> BV<'ctx> {
     let byte_size = extty_to_size(ty);
     bv.extract(byte_size - 1, 0)
 }

@@ -1,9 +1,11 @@
 use libc::{c_int, fork, waitpid};
 use qbe_reader::types::*;
 use qbe_reader::Definition;
-use z3::ast;
-use z3::ast::Ast;
-use z3::Context;
+
+use z3::{
+    ast::{Ast, Bool, BV},
+    Context,
+};
 
 use crate::error::*;
 use crate::state::*;
@@ -19,12 +21,12 @@ pub struct Interp<'ctx, 'src> {
     solver: z3::Solver<'ctx>,
 }
 
-struct Path<'ctx, 'src>(Option<z3::ast::Bool<'ctx>>, &'src Block);
+struct Path<'ctx, 'src>(Option<Bool<'ctx>>, &'src Block);
 
 enum FuncReturn<'ctx, 'src> {
     Jump(Path<'ctx, 'src>),
     CondJump(Path<'ctx, 'src>, Path<'ctx, 'src>),
-    Return(Option<ast::BV<'ctx>>),
+    Return(Option<BV<'ctx>>),
 }
 
 impl<'ctx, 'src> Path<'ctx, 'src> {
@@ -56,23 +58,23 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         })
     }
 
-    fn get_base_type(&self, name: String, ty: &BaseType) -> ast::BV<'ctx> {
+    fn get_base_type(&self, name: String, ty: &BaseType) -> BV<'ctx> {
         match ty {
-            BaseType::Word => ast::BV::new_const(self.ctx, name, WORD_SIZE),
-            BaseType::Long => ast::BV::new_const(self.ctx, name, LONG_SIZE),
+            BaseType::Word => BV::new_const(self.ctx, name, WORD_SIZE),
+            BaseType::Long => BV::new_const(self.ctx, name, LONG_SIZE),
             BaseType::Single => panic!("singles not supported"),
             BaseType::Double => panic!("doubles not supported"),
         }
     }
 
-    fn get_type(&self, name: String, ty: &Type) -> ast::BV<'ctx> {
+    fn get_type(&self, name: String, ty: &Type) -> BV<'ctx> {
         match ty {
             Type::Base(x) => self.get_base_type(name, x),
             _ => panic!("not implemented"),
         }
     }
 
-    fn get_func_param(&self, func: &FuncDef, param: &FuncParam) -> ast::BV<'ctx> {
+    fn get_func_param(&self, func: &FuncDef, param: &FuncParam) -> BV<'ctx> {
         match param {
             FuncParam::Regular(ty, name) => self.get_type(func.name.to_string() + ":" + name, ty),
             FuncParam::Env(_) => panic!("env parameters not supported"),
@@ -82,16 +84,16 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
     // Extend a bitvector of a SubWordType to a word, i.e. 32-bit.
     // The extended bits are treated as unconstrained symbolic.
-    pub fn extend_subword(&self, bv: ast::BV<'ctx>) -> ast::BV<'ctx> {
+    pub fn extend_subword(&self, bv: BV<'ctx>) -> BV<'ctx> {
         assert!(bv.get_size() < 32);
         let rem = 32 - bv.get_size();
 
-        let uncons = ast::BV::fresh_const(self.ctx, "undef-msb", rem);
+        let uncons = BV::fresh_const(self.ctx, "undef-msb", rem);
         bv.concat(&uncons)
     }
 
-    fn lookup_params(&self, params: &Vec<FuncParam>) -> Result<Vec<ast::BV<'ctx>>, Error> {
-        let mut vec: Vec<ast::BV<'ctx>> = Vec::new();
+    fn lookup_params(&self, params: &Vec<FuncParam>) -> Result<Vec<BV<'ctx>>, Error> {
+        let mut vec: Vec<BV<'ctx>> = Vec::new();
         for param in params.iter() {
             match param {
                 FuncParam::Regular(ty, name) => {
@@ -116,9 +118,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         Ok(vec)
     }
 
-    fn get_const(&self, constant: &Const) -> Result<ast::BV<'ctx>, Error> {
+    fn get_const(&self, constant: &Const) -> Result<BV<'ctx>, Error> {
         match constant {
-            Const::Number(n) => Ok(ast::BV::from_i64(self.ctx, *n, LONG_SIZE)),
+            Const::Number(n) => Ok(BV::from_i64(self.ctx, *n, LONG_SIZE)),
             Const::Global(v) => self
                 .state
                 .get_ptr(v)
@@ -128,14 +130,14 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         }
     }
 
-    fn get_dyn_const(&self, dconst: &DynConst) -> Result<ast::BV<'ctx>, Error> {
+    fn get_dyn_const(&self, dconst: &DynConst) -> Result<BV<'ctx>, Error> {
         match dconst {
             DynConst::Const(c) => self.get_const(c),
             DynConst::Thread(_) => panic!("thread-local constants not supported"),
         }
     }
 
-    fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Result<ast::BV<'ctx>, Error> {
+    fn get_value(&self, dest_ty: Option<BaseType>, value: &Value) -> Result<BV<'ctx>, Error> {
         let bv = match value {
             Value::LocalVar(var) => self
                 .state
@@ -158,7 +160,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         Ok(bv)
     }
 
-    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<ast::BV<'ctx>, Error> {
+    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<BV<'ctx>, Error> {
         // XXX: This instruction simulator assumes that the instructions are
         // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
@@ -212,7 +214,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             }
             JumpInstr::Jnz(value, nzero_label, zero_label) => {
                 let bv = self.get_value(Some(BaseType::Word), value)?;
-                let is_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
+                let is_zero = bv._eq(&BV::from_u64(self.ctx, 0, bv.get_size()));
 
                 let nzero_path = Path(Some(is_zero.not()), self.get_block(nzero_label)?);
                 let zero_path = Path(Some(is_zero.clone()), self.get_block(zero_label)?);
@@ -238,7 +240,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<Option<ast::BV<'ctx>>, Error> {
+    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<Option<BV<'ctx>>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
@@ -247,7 +249,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.exec_block(path.1)
     }
 
-    fn exec_block(&mut self, block: &'src Block) -> Result<Option<ast::BV<'ctx>>, Error> {
+    fn exec_block(&mut self, block: &'src Block) -> Result<Option<BV<'ctx>>, Error> {
         for stat in block.inst.iter() {
             self.exec_stat(stat)?;
         }
@@ -282,8 +284,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     pub fn exec_func(
         &mut self,
         func: &'src FuncDef,
-        params: Vec<ast::BV<'ctx>>,
-    ) -> Result<Option<ast::BV<'ctx>>, Error> {
+        params: Vec<BV<'ctx>>,
+    ) -> Result<Option<BV<'ctx>>, Error> {
         self.state.push_func(func);
 
         if func.params.len() != params.len() {

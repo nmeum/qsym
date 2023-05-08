@@ -1,15 +1,16 @@
-use z3::ast;
-use z3::Context;
-use z3::Sort;
+use z3::{
+    ast::{Array, BV},
+    Context, Sort,
+};
 
 pub struct Memory<'ctx> {
     ctx: &'ctx Context,
-    pub data: ast::Array<'ctx>,
+    pub data: Array<'ctx>,
 }
 
 impl<'ctx> Memory<'ctx> {
     pub fn new(ctx: &'ctx Context) -> Memory<'ctx> {
-        let ary = ast::Array::new_const(
+        let ary = Array::new_const(
             ctx,
             "memory",
             &Sort::bitvector(&ctx, 64), // index type
@@ -22,18 +23,18 @@ impl<'ctx> Memory<'ctx> {
         }
     }
 
-    pub fn store_byte(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+    pub fn store_byte(&mut self, addr: BV<'ctx>, value: BV<'ctx>) {
         assert!(addr.get_size() == 64);
         assert!(value.get_size() == 8);
         self.data = self.data.store(&addr, &value);
     }
 
-    pub fn load_byte(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+    pub fn load_byte(&self, addr: BV<'ctx>) -> BV<'ctx> {
         assert!(addr.get_size() == 64);
         self.data.select(&addr).as_bv().unwrap()
     }
 
-    pub fn store_bitvector(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+    pub fn store_bitvector(&mut self, addr: BV<'ctx>, value: BV<'ctx>) {
         assert!(value.get_size() % 8 == 0);
         let amount = value.get_size() / 8;
 
@@ -46,40 +47,37 @@ impl<'ctx> Memory<'ctx> {
         // Store each byte in memory
         bytes.enumerate().for_each(|(n, b)| {
             assert!(b.get_size() == 8);
-            self.store_byte(addr.bvadd(&ast::BV::from_u64(self.ctx, n as u64, 64)), b)
+            self.store_byte(addr.bvadd(&BV::from_u64(self.ctx, n as u64, 64)), b)
         });
     }
 
-    pub fn load_bitvector(&self, addr: ast::BV<'ctx>, amount: u64) -> ast::BV<'ctx> {
+    pub fn load_bitvector(&self, addr: BV<'ctx>, amount: u64) -> BV<'ctx> {
         // Load amount bytes from memory
         let bytes = (0..amount)
             .into_iter()
-            .map(|n| self.load_byte(addr.bvadd(&ast::BV::from_u64(self.ctx, n, 64))));
+            .map(|n| self.load_byte(addr.bvadd(&BV::from_u64(self.ctx, n, 64))));
 
         // Concat the bytes into a single bitvector
         bytes.reduce(|acc, e| acc.concat(&e)).unwrap()
     }
 
-    pub fn store_string(&mut self, addr: ast::BV<'ctx>, str: &str) -> ast::BV<'ctx> {
+    pub fn store_string(&mut self, addr: BV<'ctx>, str: &str) -> BV<'ctx> {
         let mut cur_addr = addr;
         for c in str.chars() {
             let code: u8 = c.try_into().unwrap();
-            self.store_byte(
-                cur_addr.clone(),
-                ast::BV::from_u64(self.ctx, code.into(), 8),
-            );
-            cur_addr = cur_addr.bvadd(&ast::BV::from_u64(self.ctx, 1, 64));
+            self.store_byte(cur_addr.clone(), BV::from_u64(self.ctx, code.into(), 8));
+            cur_addr = cur_addr.bvadd(&BV::from_u64(self.ctx, 1, 64));
         }
 
         cur_addr
     }
 
-    pub fn store_word(&mut self, addr: ast::BV<'ctx>, value: ast::BV<'ctx>) {
+    pub fn store_word(&mut self, addr: BV<'ctx>, value: BV<'ctx>) {
         assert!(value.get_size() == 32);
         self.store_bitvector(addr, value)
     }
 
-    pub fn load_word(&self, addr: ast::BV<'ctx>) -> ast::BV<'ctx> {
+    pub fn load_word(&self, addr: BV<'ctx>) -> BV<'ctx> {
         assert!(addr.get_size() == 64);
         self.load_bitvector(addr, 4)
     }
@@ -99,8 +97,8 @@ mod tests {
         let ctx = Context::new(&cfg);
         let mut mem = Memory::new(&ctx);
 
-        let addr = ast::BV::from_u64(&ctx, 0x800000, 64);
-        let value = ast::BV::from_u64(&ctx, 0x23, 8);
+        let addr = BV::from_u64(&ctx, 0x800000, 64);
+        let value = BV::from_u64(&ctx, 0x23, 8);
 
         mem.store_byte(addr.clone(), value.clone());
         let loaded = mem.load_byte(addr);
@@ -116,12 +114,12 @@ mod tests {
         let ctx = Context::new(&cfg);
         let mut mem = Memory::new(&ctx);
 
-        let addr = ast::BV::from_u64(&ctx, 0x0, 64);
+        let addr = BV::from_u64(&ctx, 0x0, 64);
         mem.store_string(addr, "hello");
-        let loaded = mem.load_byte(ast::BV::from_u64(&ctx, 0x0, 64));
+        let loaded = mem.load_byte(BV::from_u64(&ctx, 0x0, 64));
 
         let solver = Solver::new(&ctx);
-        solver.assert(&loaded._eq(&ast::BV::from_u64(&ctx, 0x68, 8)));
+        solver.assert(&loaded._eq(&BV::from_u64(&ctx, 0x68, 8)));
         assert_eq!(SatResult::Sat, solver.check());
     }
 
@@ -131,22 +129,22 @@ mod tests {
         let ctx = Context::new(&cfg);
         let mut mem = Memory::new(&ctx);
 
-        let addr = ast::BV::from_u64(&ctx, 0x1000, 64);
-        let word = ast::BV::from_u64(&ctx, 0xdeadbeef, 32);
+        let addr = BV::from_u64(&ctx, 0x1000, 64);
+        let word = BV::from_u64(&ctx, 0xdeadbeef, 32);
 
         mem.store_word(addr.clone(), word.clone());
         let bytes = vec![
-            mem.load_byte(ast::BV::from_u64(&ctx, 0x1000, 64)),
-            mem.load_byte(ast::BV::from_u64(&ctx, 0x1001, 64)),
-            mem.load_byte(ast::BV::from_u64(&ctx, 0x1002, 64)),
-            mem.load_byte(ast::BV::from_u64(&ctx, 0x1003, 64)),
+            mem.load_byte(BV::from_u64(&ctx, 0x1000, 64)),
+            mem.load_byte(BV::from_u64(&ctx, 0x1001, 64)),
+            mem.load_byte(BV::from_u64(&ctx, 0x1002, 64)),
+            mem.load_byte(BV::from_u64(&ctx, 0x1003, 64)),
         ];
 
         let solver = Solver::new(&ctx);
-        solver.assert(&bytes[0]._eq(&ast::BV::from_u64(&ctx, 0xde, 8)));
-        solver.assert(&bytes[1]._eq(&ast::BV::from_u64(&ctx, 0xad, 8)));
-        solver.assert(&bytes[2]._eq(&ast::BV::from_u64(&ctx, 0xbe, 8)));
-        solver.assert(&bytes[3]._eq(&ast::BV::from_u64(&ctx, 0xef, 8)));
+        solver.assert(&bytes[0]._eq(&BV::from_u64(&ctx, 0xde, 8)));
+        solver.assert(&bytes[1]._eq(&BV::from_u64(&ctx, 0xad, 8)));
+        solver.assert(&bytes[2]._eq(&BV::from_u64(&ctx, 0xbe, 8)));
+        solver.assert(&bytes[3]._eq(&BV::from_u64(&ctx, 0xef, 8)));
         assert_eq!(SatResult::Sat, solver.check());
 
         solver.reset();
