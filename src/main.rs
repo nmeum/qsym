@@ -16,7 +16,7 @@ fn run_qbe(fname: &str, source: Vec<qbe::Definition>) {
     let ctx = Context::new(&cfg);
 
     let mut interp = Interp::new(&ctx, &source).unwrap();
-    interp.exec_func(&fname.to_string()).unwrap();
+    interp.exec_symbolic(&fname.to_string()).unwrap();
 }
 
 fn main() {

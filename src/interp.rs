@@ -1,7 +1,6 @@
 use libc::{c_int, fork, waitpid};
 use qbe_reader::types::*;
 use qbe_reader::Definition;
-use std::process::exit;
 use z3::ast;
 use z3::ast::Ast;
 use z3::Context;
@@ -21,6 +20,12 @@ pub struct Interp<'ctx, 'src> {
 }
 
 struct Path<'ctx, 'src>(Option<z3::ast::Bool<'ctx>>, &'src Block);
+
+enum FuncReturn<'ctx, 'src> {
+    Jump(Path<'ctx, 'src>),
+    CondJump(Path<'ctx, 'src>, Path<'ctx, 'src>),
+    Return(Option<ast::BV<'ctx>>),
+}
 
 impl<'ctx, 'src> Path<'ctx, 'src> {
     pub fn feasible(&self, solver: &z3::Solver<'ctx>) -> bool {
@@ -67,15 +72,48 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         }
     }
 
-    fn get_func_param(&self, func: &FuncDef, param: &FuncParam) -> (String, ast::BV<'ctx>) {
+    fn get_func_param(&self, func: &FuncDef, param: &FuncParam) -> ast::BV<'ctx> {
         match param {
-            FuncParam::Regular(ty, name) => {
-                let ty = self.get_type(func.name.to_string() + ":" + name, ty);
-                (name.to_string(), ty)
-            }
-            FuncParam::Env(_) => panic!("state parameters not supported"),
+            FuncParam::Regular(ty, name) => self.get_type(func.name.to_string() + ":" + name, ty),
+            FuncParam::Env(_) => panic!("env parameters not supported"),
             FuncParam::Variadic => panic!("varadic functions not supported"),
         }
+    }
+
+    // Extend a bitvector of a SubWordType to a word, i.e. 32-bit.
+    // The extended bits are treated as unconstrained symbolic.
+    pub fn extend_subword(&self, bv: ast::BV<'ctx>) -> ast::BV<'ctx> {
+        assert!(bv.get_size() < 32);
+        let rem = 32 - bv.get_size();
+
+        let uncons = ast::BV::fresh_const(self.ctx, "undef-msb", rem);
+        bv.concat(&uncons)
+    }
+
+    fn lookup_params(&self, params: &Vec<FuncParam>) -> Result<Vec<ast::BV<'ctx>>, Error> {
+        let mut vec: Vec<ast::BV<'ctx>> = Vec::new();
+        for param in params.iter() {
+            match param {
+                FuncParam::Regular(ty, name) => {
+                    let mut val = self
+                        .state
+                        .get_local(name)
+                        .ok_or(Error::UnknownVariable(name.to_string()))?;
+
+                    // Calls with a sub-word return type define a temporary of
+                    // base type `w` with its most significant bits unspecified.
+                    if let Type::SubWordType(_) = ty {
+                        val = self.extend_subword(val)
+                    }
+
+                    vec.push(val);
+                }
+                FuncParam::Env(_) => panic!("env parameters not supported"),
+                FuncParam::Variadic => panic!("varadic functions not supported"),
+            };
+        }
+
+        Ok(vec)
     }
 
     fn get_const(&self, constant: &Const) -> Result<ast::BV<'ctx>, Error> {
@@ -143,6 +181,18 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let result = self.exec_inst(Some(*base), &inst)?;
                 self.state.add_local(dest.to_string(), result);
             }
+            Statement::Call(dest, _ty, fname, params) => {
+                let values = self.lookup_params(params)?;
+                let func = self
+                    .state
+                    .get_func(fname)
+                    .ok_or(Error::UnknownFunction(fname.to_string()))?;
+
+                let result = self.exec_func(func, values)?;
+                if let Some(ret_val) = result {
+                    self.state.add_local(dest.to_string(), ret_val);
+                }
+            }
         }
 
         Ok(())
@@ -154,12 +204,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             .ok_or(Error::UnknownLabel(label.to_string()))
     }
 
-    fn exec_jump(
-        &self,
-        instr: &JumpInstr,
-    ) -> Result<(Path<'ctx, 'src>, Option<Path<'ctx, 'src>>), Error> {
+    fn exec_jump(&self, instr: &JumpInstr) -> Result<FuncReturn<'ctx, 'src>, Error> {
         match instr {
-            JumpInstr::Jump(label) => Ok((Path(None, self.get_block(label)?), None)),
+            JumpInstr::Jump(label) => {
+                let path = Path(None, self.get_block(label)?);
+                Ok(FuncReturn::Jump(path))
+            }
             JumpInstr::Jnz(value, nzero_label, zero_label) => {
                 let bv = self.get_value(Some(BaseType::Word), value)?;
                 let is_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
@@ -169,17 +219,17 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
                 let zero_feasible = zero_path.feasible(&self.solver);
                 if zero_feasible && nzero_path.feasible(&self.solver) {
-                    Ok((nzero_path, Some(zero_path)))
+                    Ok(FuncReturn::CondJump(nzero_path, zero_path))
                 } else if zero_feasible {
-                    Ok((zero_path, None))
+                    Ok(FuncReturn::Jump(zero_path))
                 } else {
-                    // non-zero
-                    Ok((nzero_path, None))
+                    Ok(FuncReturn::Jump(nzero_path))
                 }
             }
-            JumpInstr::Return(_) => {
-                panic!("Return instruction not implemented");
-            }
+            JumpInstr::Return(opt_val) => match opt_val {
+                Some(x) => Ok(FuncReturn::Return(Some(self.get_value(None, x)?))),
+                None => Ok(FuncReturn::Return(None)),
+            },
             JumpInstr::Halt => {
                 println!("Halting executing");
                 Err(Error::HaltExecution)
@@ -188,7 +238,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(&mut self, path: &Path) -> Result<(), Error> {
+    fn explore_path(&mut self, path: &Path) -> Result<Option<ast::BV<'ctx>>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
@@ -197,7 +247,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.exec_block(path.1)
     }
 
-    fn exec_block(&mut self, block: &Block) -> Result<(), Error> {
+    fn exec_block(&mut self, block: &Block) -> Result<Option<ast::BV<'ctx>>, Error> {
         for stat in block.inst.iter() {
             self.exec_stat(stat)?;
         }
@@ -209,7 +259,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             // explosion issues for any somewhat complex program. In the future,
             // the State module should be modified to allow efficient copies of
             // the state by leveraging a copy-on-write mechanism.
-            (path1, Some(path2)) => unsafe {
+            FuncReturn::CondJump(path1, path2) => unsafe {
                 let pid = fork();
                 match pid {
                     -1 => Err(Error::ForkFailed),
@@ -224,31 +274,57 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                     }
                 }
             },
-            (path, None) => self.explore_path(&path),
+            FuncReturn::Jump(path) => self.explore_path(&path),
+            FuncReturn::Return(value) => Ok(value),
         }
     }
 
-    pub fn exec_func(&mut self, name: &String) -> Result<(), Error> {
-        let func = self
-            .state
-            .set_func(name)
-            .ok_or(Error::UnknownFunction(name.to_string()))?;
+    pub fn exec_func(
+        &mut self,
+        func: &'src FuncDef,
+        params: Vec<ast::BV<'ctx>>,
+    ) -> Result<Option<ast::BV<'ctx>>, Error> {
+        self.state.push_func(func);
 
-        for param in func.params.iter() {
-            let (name, bv) = self.get_func_param(func, param);
-            self.state.add_local(name, bv);
+        if func.params.len() != params.len() {
+            return Err(Error::InvalidCall);
+        }
+        for i in 0..func.params.len() {
+            let name = func.params[i].get_name().unwrap();
+            let bv = params[i].clone();
+            self.state.add_local(name.to_string(), bv);
         }
 
         for block in func.body.iter() {
             match self.exec_block(block) {
                 Err(Error::HaltExecution) => {
                     self.dump();
-                    exit(0)
+                    return Ok(None);
                 }
                 Err(x) => return Err(x),
-                Ok(x) => x,
+                Ok(x) => {
+                    self.state.pop_func();
+                    return Ok(x);
+                }
             }
         }
+
+        unreachable!();
+    }
+
+    // TODO: Reduce code duplication with exec_func
+    pub fn exec_symbolic(&mut self, name: &String) -> Result<(), Error> {
+        let func = self
+            .state
+            .get_func(name)
+            .ok_or(Error::UnknownFunction(name.to_string()))?;
+
+        let params = func
+            .params
+            .iter()
+            .map(|p| self.get_func_param(func, p))
+            .collect();
+        self.exec_func(func, params)?;
 
         Ok(())
     }
@@ -258,9 +334,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.solver.check();
 
         println!("Local variables:");
-        let mut v: Vec<_> = self.state.local.iter().collect();
-        v.sort_by_key(|a| a.0);
-        for (key, value) in v.iter() {
+        for (key, value) in self.state.get_locals().iter() {
             println!("\t{} = {}", key, value.simplify());
         }
 

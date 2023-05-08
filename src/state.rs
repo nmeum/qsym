@@ -13,16 +13,18 @@ use crate::util::*;
 // representation. Hence, we just store this pattern instead.
 const FUNC_PATTERN: u64 = 0xdeadbeef;
 
+struct FuncState<'ctx, 'src> {
+    labels: HashMap<&'src str, &'src Block>,
+    local: HashMap<String, ast::BV<'ctx>>, // TODO: use &str here
+}
+
 pub struct State<'ctx, 'src> {
     ctx: &'ctx Context,
+    pub mem: Memory<'ctx>,
 
     func: HashMap<&'src str, (ast::BV<'ctx>, &'src FuncDef)>,
     data: HashMap<&'src str, (ast::BV<'ctx>, &'src DataDef)>,
-
-    labels: Option<HashMap<&'src str, &'src Block>>,
-
-    pub mem: Memory<'ctx>,
-    pub local: HashMap<String, ast::BV<'ctx>>,
+    stck: Vec<FuncState<'ctx, 'src>>,
 }
 
 impl<'ctx, 'src> State<'ctx, 'src> {
@@ -35,9 +37,8 @@ impl<'ctx, 'src> State<'ctx, 'src> {
 
             func: HashMap::new(),
             data: HashMap::new(),
-            local: HashMap::new(),
+            stck: Vec::new(),
 
-            labels: None,
             mem: Memory::new(ctx),
         };
 
@@ -173,35 +174,50 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         }
     }
 
-    // TODO: Return a FuncFrame type here and store functional-local information in it.
-    pub fn set_func(&mut self, name: &str) -> Option<&'src FuncDef> {
-        let (_, func) = self.func.get(name)?;
+    pub fn get_func(&mut self, name: &str) -> Option<&'src FuncDef> {
+        Some(self.func.get(name)?.1)
+    }
 
+    /////
+    // Function-local operations
+    /////
+
+    pub fn push_func(&mut self, func: &'src FuncDef) {
         let blocks = func.body.iter().map(|blk| (blk.label.as_str(), blk));
-        self.labels = Some(HashMap::from_iter(blocks));
+        let state = FuncState {
+            labels: HashMap::from_iter(blocks),
+            local: HashMap::new(),
+        };
 
-        Some(func)
+        self.stck.push(state);
     }
 
     pub fn get_block(&self, name: &str) -> Option<&'src Block> {
-        match &self.labels {
-            Some(m) => m.get(name).map(|b| *b),
-            None => None,
-        }
+        let func = self.stck.last().unwrap();
+        func.labels.get(name).map(|b| *b)
     }
 
     pub fn add_local(&mut self, name: String, value: ast::BV<'ctx>) {
-        self.local.insert(name, value);
+        let func = self.stck.last_mut().unwrap();
+        func.local.insert(name, value);
     }
 
     pub fn get_local(&self, name: &str) -> Option<ast::BV<'ctx>> {
+        let func = self.stck.last().unwrap();
         // ast::BV should be an owned object modeled on a C++
         // smart pointer. Hence the clone here is cheap
-        self.local.get(name).cloned()
+        func.local.get(name).cloned()
     }
 
-    // TODO: Requires a stack of hash maps.
-    // pub fn pop_func(&mut self) {
-    //     self.local = HashMap::new();
-    // }
+    pub fn pop_func(&mut self) {
+        self.stck.pop().unwrap();
+    }
+
+    // TODO: Remove this
+    pub fn get_locals(&self) -> Vec<(&String, &ast::BV<'ctx>)> {
+        let func = self.stck.last().unwrap();
+        let mut v: Vec<_> = func.local.iter().collect();
+        v.sort_by_key(|a| a.0);
+        v
+    }
 }
