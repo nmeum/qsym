@@ -258,7 +258,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.solver.check();
 
         println!("Local variables:");
-        for (key, value) in self.state.local.iter() {
+        let mut v: Vec<_> = self.state.local.iter().collect();
+        v.sort_by_key(|a| a.0);
+        for (key, value) in v.iter() {
             println!("\t{} = {}", key, value.simplify());
         }
 
