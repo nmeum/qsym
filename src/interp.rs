@@ -175,11 +175,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         }
     }
 
-    fn exec_stat(&mut self, stat: &Statement) -> Result<(), Error> {
+    fn exec_stat(&mut self, stat: &'src Statement) -> Result<(), Error> {
         match stat {
             Statement::Assign(dest, base, inst) => {
                 let result = self.exec_inst(Some(*base), &inst)?;
-                self.state.add_local(dest.to_string(), result);
+                self.state.add_local(dest, result);
             }
             Statement::Call(dest, _ty, fname, params) => {
                 let values = self.lookup_params(params)?;
@@ -190,7 +190,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
                 let result = self.exec_func(func, values)?;
                 if let Some(ret_val) = result {
-                    self.state.add_local(dest.to_string(), ret_val);
+                    self.state.add_local(dest, ret_val);
                 }
             }
         }
@@ -238,7 +238,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(&mut self, path: &Path) -> Result<Option<ast::BV<'ctx>>, Error> {
+    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<Option<ast::BV<'ctx>>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
@@ -247,7 +247,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.exec_block(path.1)
     }
 
-    fn exec_block(&mut self, block: &Block) -> Result<Option<ast::BV<'ctx>>, Error> {
+    fn exec_block(&mut self, block: &'src Block) -> Result<Option<ast::BV<'ctx>>, Error> {
         for stat in block.inst.iter() {
             self.exec_stat(stat)?;
         }
@@ -292,7 +292,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         for i in 0..func.params.len() {
             let name = func.params[i].get_name().unwrap();
             let bv = params[i].clone();
-            self.state.add_local(name.to_string(), bv);
+            self.state.add_local(name, bv);
         }
 
         for block in func.body.iter() {
@@ -334,9 +334,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.solver.check();
 
         println!("Local variables:");
-        for (key, value) in self.state.get_locals().iter() {
-            println!("\t{} = {}", key, value.simplify());
-        }
+        self.state.dump_locals();
 
         let model = self.solver.get_model();
         match model {

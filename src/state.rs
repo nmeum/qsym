@@ -2,6 +2,7 @@ use qbe_reader::types::*;
 use qbe_reader::Definition;
 use std::collections::HashMap;
 use z3::ast;
+use z3::ast::Ast;
 use z3::Context;
 
 use crate::error::*;
@@ -15,7 +16,7 @@ const FUNC_PATTERN: u64 = 0xdeadbeef;
 
 struct FuncState<'ctx, 'src> {
     labels: HashMap<&'src str, &'src Block>,
-    local: HashMap<String, ast::BV<'ctx>>, // TODO: use &str here
+    local: HashMap<&'src str, ast::BV<'ctx>>,
 }
 
 pub struct State<'ctx, 'src> {
@@ -197,7 +198,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         func.labels.get(name).map(|b| *b)
     }
 
-    pub fn add_local(&mut self, name: String, value: ast::BV<'ctx>) {
+    pub fn add_local(&mut self, name: &'src str, value: ast::BV<'ctx>) {
         let func = self.stck.last_mut().unwrap();
         func.local.insert(name, value);
     }
@@ -214,10 +215,14 @@ impl<'ctx, 'src> State<'ctx, 'src> {
     }
 
     // TODO: Remove this
-    pub fn get_locals(&self) -> Vec<(&String, &ast::BV<'ctx>)> {
+    pub fn dump_locals(&self) {
         let func = self.stck.last().unwrap();
+
         let mut v: Vec<_> = func.local.iter().collect();
         v.sort_by_key(|a| a.0);
-        v
+
+        for (key, value) in v.iter() {
+            println!("\t{} = {}", key, value.simplify());
+        }
     }
 }
