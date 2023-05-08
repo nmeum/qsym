@@ -189,7 +189,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
     #[inline]
     fn explore_path(&mut self, path: &Path) -> Result<(), Error> {
-        println!("Exploring path for label {}", path.1.label);
+        println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
             self.solver.assert(c);
@@ -256,14 +256,20 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     // XXX: Just a hack to see stuff right now.
     pub fn dump(&self) {
         self.solver.check();
-        let model = self.solver.get_model();
-        match model {
-            None => println!("no model"),
-            Some(m) => print!("model: {}", m),
-        };
 
+        println!("Local variables:");
         for (key, value) in self.state.local.iter() {
             println!("\t{} = {}", key, value.simplify());
         }
+
+        let model = self.solver.get_model();
+        match model {
+            None => panic!("Couldn't generate a Z3 model"),
+            Some(m) => {
+                let out = format!("{}", m);
+                println!("Symbolic variable values:");
+                println!("\t{}", out.replace("\n", "\n\t"));
+            }
+        };
     }
 }
