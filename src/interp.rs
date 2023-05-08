@@ -214,8 +214,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let bv = self.get_value(Some(BaseType::Word), value)?;
                 let is_zero = bv._eq(&ast::BV::from_u64(self.ctx, 0, bv.get_size()));
 
-                let nzero_path = Path(Some(is_zero.clone().not()), self.get_block(nzero_label)?);
-                let zero_path = Path(Some(is_zero), self.get_block(zero_label)?);
+                let nzero_path = Path(Some(is_zero.not()), self.get_block(nzero_label)?);
+                let zero_path = Path(Some(is_zero.clone()), self.get_block(zero_label)?);
 
                 let zero_feasible = zero_path.feasible(&self.solver);
                 if zero_feasible && nzero_path.feasible(&self.solver) {
