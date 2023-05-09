@@ -10,13 +10,14 @@ use z3::{
 use crate::error::*;
 use crate::memory::*;
 use crate::util::*;
+use crate::value::*;
 
 // Bit pattern used to pretend that we actually store functions
 // in memory (which we don't) cause we don't have an instruction
 // representation. Hence, we just store this pattern instead.
 //
 // TODO: Just store unconstrained symbolic bytes instead.
-const FUNC_PATTERN: u64 = 0xdeadbeef;
+const FUNC_PATTERN: u32 = 0xdeadbeef;
 
 struct FuncState<'ctx, 'src> {
     labels: HashMap<&'src str, &'src Block>,
@@ -24,7 +25,7 @@ struct FuncState<'ctx, 'src> {
 }
 
 pub struct State<'ctx, 'src> {
-    ctx: &'ctx Context,
+    v: ValueFactory<'ctx>,
     pub mem: Memory<'ctx>,
 
     func: HashMap<&'src str, (BV<'ctx>, &'src FuncDef)>,
@@ -38,7 +39,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         source: &'src Vec<Definition>,
     ) -> Result<State<'ctx, 'src>, Error> {
         let mut state = State {
-            ctx: ctx,
+            v: ValueFactory::new(ctx),
 
             func: HashMap::new(),
             data: HashMap::new(),
@@ -66,8 +67,8 @@ impl<'ctx, 'src> State<'ctx, 'src> {
 
     fn add_func(&mut self, addr: BV<'ctx>, func: &'src FuncDef) -> BV<'ctx> {
         self.mem
-            .store_word(addr.clone(), BV::from_u64(self.ctx, FUNC_PATTERN, 32));
-        let end_addr = addr.bvadd(&BV::from_u64(self.ctx, 4, 64));
+            .store_word(addr.clone(), self.v.make_word(FUNC_PATTERN));
+        let end_addr = addr.bvadd(&self.v.make_long(4));
 
         self.func.insert(&func.name, (addr.clone(), func));
         end_addr
@@ -94,9 +95,9 @@ impl<'ctx, 'src> State<'ctx, 'src> {
                 }
             }
             DataObj::ZeroFill(n) => {
-                let zero = BV::from_i64(self.ctx, 0, 8);
+                let zero = self.v.make_byte(0);
                 for i in 0..*n {
-                    cur_addr = cur_addr.bvadd(&BV::from_u64(self.ctx, i, 64));
+                    cur_addr = cur_addr.bvadd(&self.v.make_long(i));
                     self.mem.store_byte(cur_addr.clone(), zero.clone())
                 }
             }
@@ -119,8 +120,9 @@ impl<'ctx, 'src> State<'ctx, 'src> {
                     self.get_ptr(name)
                         .ok_or(Error::UnknownVariable(name.to_string()))?,
                 );
+                assert!(ptr.get_size() == LONG_SIZE);
                 if let Some(off) = offset {
-                    let off = BV::from_u64(self.ctx, *off, ptr.get_size());
+                    let off = self.v.make_long(*off);
                     ptr = ptr.bvadd(&off);
                 }
 
@@ -128,7 +130,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
                 let bytes = (ptr.get_size() / 8) as u64;
 
                 self.mem.store_bitvector(cur_addr.clone(), ptr);
-                cur_addr = cur_addr.bvadd(&BV::from_u64(self.ctx, bytes, 64));
+                cur_addr = cur_addr.bvadd(&self.v.make_long(bytes));
             }
             DataItem::String(str) => {
                 if *ty != ExtType::Byte {
@@ -139,13 +141,12 @@ impl<'ctx, 'src> State<'ctx, 'src> {
             // TODO: Reduce code duplication with get_const() from interp.rs
             DataItem::Const(c) => match c {
                 Const::Number(n) => {
-                    let size = extty_to_size(ty);
-                    let word = BV::from_i64(self.ctx, *n, size);
-                    self.mem.store_word(cur_addr.clone(), word);
+                    let bv = self.v.from_ext_i64(*ty, *n);
+                    let size = bv.get_size() as u64;
+                    self.mem.store_bitvector(cur_addr.clone(), bv);
 
                     assert!(size % 8 == 0);
-                    let bytes = (size / 8) as u64;
-                    cur_addr = cur_addr.bvadd(&BV::from_u64(self.ctx, bytes, 64));
+                    cur_addr = cur_addr.bvadd(&self.v.make_long(size / 8));
                 }
                 Const::SFP(_) => {
                     panic!("single precision floating points not supported")

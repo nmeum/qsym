@@ -53,6 +53,16 @@ impl<'ctx> ValueFactory<'ctx> {
     // Bitvector Factory Functions
     ////
 
+    pub fn from_ext(&self, ty: ExtType, name: String) -> BV<'ctx> {
+        let size = Self::extty_to_size(ty);
+        BV::new_const(self.ctx, name, size)
+    }
+
+    pub fn from_ext_i64(&self, ty: ExtType, v: i64) -> BV<'ctx> {
+        let size = Self::extty_to_size(ty);
+        BV::from_i64(self.ctx, v, size)
+    }
+
     pub fn from_base(&self, ty: BaseType, name: String) -> BV<'ctx> {
         let size = Self::basety_to_size(ty);
         BV::new_const(self.ctx, name, size)
