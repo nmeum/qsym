@@ -9,14 +9,10 @@ use z3::{
 
 use crate::error::*;
 use crate::state::*;
-
-//const BYTE_SIZE: u32 = 8;
-//const HALF_SIZE: u32 = 16;
-const WORD_SIZE: u32 = 32;
-const LONG_SIZE: u32 = 64;
+use crate::value::*;
 
 pub struct Interp<'ctx, 'src> {
-    ctx: &'ctx Context, // The Z3 context
+    v: ValueFactory<'ctx>,
     state: State<'ctx, 'src>,
     solver: z3::Solver<'ctx>,
 }
@@ -52,24 +48,15 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     ) -> Result<Interp<'ctx, 'src>, Error> {
         let state = State::new(&ctx, source)?;
         Ok(Interp {
-            ctx: ctx,
+            v: ValueFactory::new(ctx),
             state: state,
             solver: z3::Solver::new(&ctx),
         })
     }
 
-    fn get_base_type(&self, name: String, ty: &BaseType) -> BV<'ctx> {
-        match ty {
-            BaseType::Word => BV::new_const(self.ctx, name, WORD_SIZE),
-            BaseType::Long => BV::new_const(self.ctx, name, LONG_SIZE),
-            BaseType::Single => panic!("singles not supported"),
-            BaseType::Double => panic!("doubles not supported"),
-        }
-    }
-
     fn get_type(&self, name: String, ty: &Type) -> BV<'ctx> {
         match ty {
-            Type::Base(x) => self.get_base_type(name, x),
+            Type::Base(ty) => self.v.from_base(*ty, name),
             _ => panic!("not implemented"),
         }
     }
@@ -80,16 +67,6 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             FuncParam::Env(_) => panic!("env parameters not supported"),
             FuncParam::Variadic => panic!("varadic functions not supported"),
         }
-    }
-
-    // Extend a bitvector of a SubWordType to a word, i.e. 32-bit.
-    // The extended bits are treated as unconstrained symbolic.
-    pub fn extend_subword(&self, bv: BV<'ctx>) -> BV<'ctx> {
-        assert!(bv.get_size() < 32);
-        let rem = 32 - bv.get_size();
-
-        let uncons = BV::fresh_const(self.ctx, "undef-msb", rem);
-        bv.concat(&uncons)
     }
 
     fn lookup_params(&self, params: &Vec<FuncParam>) -> Result<Vec<BV<'ctx>>, Error> {
@@ -104,8 +81,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
                     // Calls with a sub-word return type define a temporary of
                     // base type `w` with its most significant bits unspecified.
-                    if let Type::SubWordType(_) = ty {
-                        val = self.extend_subword(val)
+                    if let Type::SubWordType(swty) = ty {
+                        val = self.v.extend_subword(*swty, val)
                     }
 
                     vec.push(val);
@@ -120,7 +97,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
     fn get_const(&self, constant: &Const) -> Result<BV<'ctx>, Error> {
         match constant {
-            Const::Number(n) => Ok(BV::from_i64(self.ctx, *n, LONG_SIZE)),
+            Const::Number(n) => Ok(self.v.from_base_i64(BaseType::Long, *n)),
             Const::Global(v) => self
                 .state
                 .get_ptr(v)
@@ -148,11 +125,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
         // See https://c9x.me/compile/doc/il-v1.1.html#Subtyping
         if let Some(x) = dest_ty {
-            if x == BaseType::Word && bv.get_size() == 64 {
+            if x == BaseType::Word && bv.get_size() == LONG_SIZE {
                 let lsb = bv.extract(31, 0); // XXX
-                assert!(lsb.get_size() == 32);
+                assert!(lsb.get_size() == WORD_SIZE);
                 return Ok(lsb);
-            } else if x == BaseType::Word && bv.get_size() != 32 {
+            } else if x == BaseType::Word && bv.get_size() != WORD_SIZE {
                 return Err(Error::InvalidSubtyping);
             }
         }
@@ -214,7 +191,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             }
             JumpInstr::Jnz(value, nzero_label, zero_label) => {
                 let bv = self.get_value(Some(BaseType::Word), value)?;
-                let is_zero = bv._eq(&BV::from_u64(self.ctx, 0, bv.get_size()));
+
+                assert!(bv.get_size() == WORD_SIZE);
+                let is_zero = bv._eq(&self.v.make_word(0));
 
                 let nzero_path = Path(Some(is_zero.not()), self.get_block(nzero_label)?);
                 let zero_path = Path(Some(is_zero.clone()), self.get_block(zero_label)?);

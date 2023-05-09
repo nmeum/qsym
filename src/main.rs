@@ -3,6 +3,7 @@ mod interp;
 mod memory;
 mod state;
 mod util;
+mod value;
 
 use qbe_reader as qbe;
 use std::env;
