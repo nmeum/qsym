@@ -9,7 +9,6 @@ use z3::{
 
 use crate::error::*;
 use crate::memory::*;
-use crate::util::*;
 use crate::value::*;
 
 // Bit pattern used to pretend that we actually store functions
@@ -115,11 +114,9 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         let mut cur_addr = addr;
         match item {
             DataItem::Symbol(name, offset) => {
-                let mut ptr = cast_to(
-                    ty,
-                    self.get_ptr(name)
-                        .ok_or(Error::UnknownVariable(name.to_string()))?,
-                );
+                let mut ptr = self
+                    .get_ptr(name)
+                    .ok_or(Error::UnknownVariable(name.to_string()))?;
                 assert!(ptr.get_size() == LONG_SIZE);
                 if let Some(off) = offset {
                     let off = self.v.make_long(*off);
