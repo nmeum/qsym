@@ -47,7 +47,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
             mem: Memory::new(ctx),
         };
 
-        let mut func_end_ptr = BV::from_i64(ctx, 0, 64);
+        let mut func_end_ptr = state.v.make_long(0);
         for x in source.into_iter() {
             if let Definition::Func(f) = x {
                 func_end_ptr = state.add_func(func_end_ptr.clone(), f);
