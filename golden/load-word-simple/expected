@@ -1,0 +1,7 @@
+Halting executing
+Local variables:
+	a = |main:a|
+	ptr = #x0000000000000004
+	val = #x00000926
+Symbolic variable values:
+	

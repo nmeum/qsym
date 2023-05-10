@@ -1,0 +1,6 @@
+Halting executing
+Local variables:
+	a = |main:a|
+	val = #x68656c6c
+Symbolic variable values:
+	

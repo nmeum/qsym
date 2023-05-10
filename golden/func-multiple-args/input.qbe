@@ -1,0 +1,11 @@
+function w $main(w %a, w %b) {
+@start
+	%c =w add %a, %b
+        jnz %c, @end1, @end2
+@end1
+        %exit =w add 0, 1
+        hlt
+@end2
+        %exit =w add 0, 2
+        hlt
+}

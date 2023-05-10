@@ -1,0 +1,17 @@
+function w $callee(w %a) {
+@start
+        %a =w add 1, %a
+        ret %a
+}
+
+function w $main(w %a) {
+@start
+        %symbolic =w call $callee(w %a)
+        jnz %symbolic, @end1, @end2
+@end1
+        %exit =w add 0, 2342
+        hlt
+@end2
+        %exit =w add 0, 4223
+        hlt
+}

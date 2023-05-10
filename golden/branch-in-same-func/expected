@@ -1,0 +1,16 @@
+[jnz] Exploring path for label 'end1'
+Halting executing
+Local variables:
+	a = |main:a|
+	exit = #x00000001
+Symbolic variable values:
+	main:a -> #x00000002
+	
+[jnz] Exploring path for label 'end2'
+Halting executing
+Local variables:
+	a = |main:a|
+	exit = #x00000002
+Symbolic variable values:
+	main:a -> #x00000000
+	

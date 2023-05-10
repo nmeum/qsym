@@ -1,0 +1,8 @@
+data $data = { w 2342 }
+
+function w $main(w %a) {
+@start
+	%ptr =l add $data, 0
+	%val =w loadw %ptr
+	hlt
+}

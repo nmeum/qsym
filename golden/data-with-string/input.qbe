@@ -1,0 +1,7 @@
+data $data = { b "hello world" }
+
+function w $main(w %a) {
+@start
+	%val =w loadw $data
+	hlt
+}

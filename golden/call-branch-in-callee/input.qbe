@@ -1,11 +1,17 @@
-export function w $myfunc(w %a) {
+function w $callee(w %a) {
 @start
         %a =w add 0, %a
         jnz %a, @end1, @end2
 @end1
         %exit =w add 0, 1
-        hlt
+        ret %a
 @end2
         %exit =w add 0, 2
+        ret %a
+}
+
+function w $main(w %a) {
+@start
+        %b =w call $callee(w %a)
         hlt
 }
