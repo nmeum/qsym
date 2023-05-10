@@ -54,16 +54,18 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         })
     }
 
-    fn get_type(&self, name: String, ty: &Type) -> BV<'ctx> {
+    fn symbolic_type(&self, name: String, ty: &Type) -> BV<'ctx> {
         match ty {
             Type::Base(ty) => self.v.from_base(*ty, name),
             _ => panic!("not implemented"),
         }
     }
 
-    fn get_func_param(&self, func: &FuncDef, param: &FuncParam) -> BV<'ctx> {
+    fn make_symbolic(&self, func: &FuncDef, param: &FuncParam) -> BV<'ctx> {
         match param {
-            FuncParam::Regular(ty, name) => self.get_type(func.name.to_string() + ":" + name, ty),
+            FuncParam::Regular(ty, name) => {
+                self.symbolic_type(func.name.to_string() + ":" + name, ty)
+            }
             FuncParam::Env(_) => panic!("env parameters not supported"),
             FuncParam::Variadic => panic!("varadic functions not supported"),
         }
@@ -302,7 +304,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         let params = func
             .params
             .iter()
-            .map(|p| self.get_func_param(func, p))
+            .map(|p| self.make_symbolic(func, p))
             .collect();
         self.exec_func(func, params)?;
 
