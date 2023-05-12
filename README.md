@@ -1,6 +1,6 @@
 ## Symbolic execution for the QBE IL
 
-qsym is a [symbolic execution][ tool for the [QBE][qbe web] intermediate language.
+qsym is a [symbolic execution][symex wikipedia] tool for the [QBE][qbe web] intermediate language.
 The tool leverages [Z3][z3 web] to execute QBE IL based on [SMT bitvectors][smt wikipedia].
 This enables qsym to reason about conditional jumps in the QBE IL, exploring both branches (if feasible under the current constraints).
 
