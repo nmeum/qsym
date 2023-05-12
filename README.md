@@ -1,22 +1,22 @@
-### Symbolic execution for the QBE IL
+## Symbolic execution for the QBE IL
 
 qsym is a [symbolic execution][ tool for the [QBE][qbe web] intermediate language.
 The tool leverages [Z3][z3 web] to execute QBE IL based on [SMT bitvectors][smt wikipedia].
 This enables qsym to reason about conditional jumps in the QBE IL, exploring both branches (if feasible under the current constraints).
 
-#### Status
+### Status
 
 qsym is in very early stages of development and presently mostly a proof-of-concept.
 The underlying parser for the QBE IL ([qbe-reader][qbe-reader github]) is also not yet complete, hence it does not support every syntactically valid QBE IL input yet.
 Furthermore, it is assumed that input programs are well typed, e.g. no type checks are performed for instruction arguments.
 
-#### Installation
+### Installation
 
 Clone the repository and run the following command:
 
     $ cargo install --path .
 
-#### Usage Example
+### Usage Example
 
 Presently, qsym treats the parameters of a selected function as unconstrained symbolic and executes this function.
 Consider the following example:
@@ -53,7 +53,7 @@ Consider the following example:
 For the provided example program, qsym discovers two possible execution paths through the function `main`.
 In the first execution path the symbolic variable `%a` is zero, in the other it is non-zero.
 
-#### License
+### License
 
 This program is free software: you can redistribute it and/or modify it
 under the terms of the GNU Affero General Public License as published by
