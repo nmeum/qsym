@@ -285,7 +285,14 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 }
             },
             FuncReturn::Jump(path) => self.explore_path(&path),
-            FuncReturn::Return(value) => Ok(value),
+            FuncReturn::Return(value) => {
+                // TODO: Treat return from entry point function like `hlt` for now.
+                if self.state.stack_size() == 1 {
+                    Err(Error::HaltExecution)
+                } else {
+                    Ok(value)
+                }
+            }
         }
     }
 

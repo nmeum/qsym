@@ -29,7 +29,7 @@ struct FuncState<'ctx, 'src> {
 pub struct State<'ctx, 'src> {
     v: ValueFactory<'ctx>,
     pub mem: Memory<'ctx>,
-    pub stkptr: BV<'ctx>,
+    stkptr: BV<'ctx>,
 
     func: HashMap<&'src str, (BV<'ctx>, &'src FuncDef)>,
     data: HashMap<&'src str, (BV<'ctx>, &'src DataDef)>,
@@ -178,6 +178,10 @@ impl<'ctx, 'src> State<'ctx, 'src> {
 
     pub fn get_func(&mut self, name: &str) -> Option<&'src FuncDef> {
         Some(self.func.get(name)?.1)
+    }
+
+    pub fn stack_size(&self) -> usize {
+        self.stck.len()
     }
 
     pub fn stack_alloc(&mut self, align: u64, size: u64) -> BV<'ctx> {
