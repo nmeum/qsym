@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 libc = "0.2.142"
-qbe_reader = { path = "../qbe-reader" }
+qbe_reader = { git = "https://github.com/nmeum/qbe-reader.git" }
 z3 = "0.11.2"
