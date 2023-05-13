@@ -9,4 +9,5 @@ pub enum Error {
     WaitpidFailed,
     UnsupportedStringType,
     InvalidCall,
+    MissingJump,
 }

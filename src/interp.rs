@@ -25,6 +25,11 @@ enum FuncReturn<'ctx, 'src> {
     Return(Option<BV<'ctx>>),
 }
 
+enum BlockReturn<'ctx> {
+    Value(Option<BV<'ctx>>),
+    Fallthrough,
+}
+
 impl<'ctx, 'src> Path<'ctx, 'src> {
     pub fn feasible(&self, solver: &z3::Solver<'ctx>) -> bool {
         let cond = match &self.0 {
@@ -248,7 +253,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<Option<BV<'ctx>>, Error> {
+    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<BlockReturn<'ctx>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
@@ -257,12 +262,17 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         self.exec_block(path.1)
     }
 
-    fn exec_block(&mut self, block: &'src Block) -> Result<Option<BV<'ctx>>, Error> {
+    fn exec_block(&mut self, block: &'src Block) -> Result<BlockReturn<'ctx>, Error> {
         for stat in block.inst.iter() {
             self.exec_stat(stat)?;
         }
 
-        let targets = self.exec_jump(&block.jump)?;
+        let jump = match &block.jump {
+            Some(x) => x,
+            None => return Ok(BlockReturn::Fallthrough),
+        };
+
+        let targets = self.exec_jump(jump)?;
         match targets {
             // For conditional jumps, we fork(3) the entire interpreter process.
             // This is, obviously, horribly inefficient and will lead to memory
@@ -290,7 +300,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 if self.state.stack_size() == 1 {
                     Err(Error::HaltExecution)
                 } else {
-                    Ok(value)
+                    Ok(BlockReturn::Value(value))
                 }
             }
         }
@@ -319,14 +329,18 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                     return Ok(None);
                 }
                 Err(x) => return Err(x),
-                Ok(x) => {
-                    self.state.pop_func();
-                    return Ok(x);
-                }
+                Ok(r) => match r {
+                    BlockReturn::Value(v) => {
+                        self.state.pop_func();
+                        return Ok(v);
+                    }
+                    BlockReturn::Fallthrough => continue,
+                },
             }
         }
 
-        unreachable!();
+        // Last block is not terminated by a jump instruction.
+        Err(Error::MissingJump)
     }
 
     pub fn exec_symbolic(&mut self, name: &String) -> Result<(), Error> {
