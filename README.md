@@ -69,7 +69,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 [qbe web]: https://c9x.me/compile/
-[symex wikipedia] https://en.wikipedia.org/wiki/Symbolic_execution
+[symex wikipedia]: https://en.wikipedia.org/wiki/Symbolic_execution
 [z3 web]: https://github.com/Z3Prover/z3
 [smt wikipedia]: https://en.wikipedia.org/wiki/Satisfiability_modulo_theories
 [qbe-reader github]: https://github.com/nmeum/qbe-reader
