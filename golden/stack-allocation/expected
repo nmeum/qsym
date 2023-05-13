@@ -1,0 +1,28 @@
+[jnz] Exploring path for label 'end1'
+Halting executing
+Local variables:
+	A0 = #x0000000000000008
+	A1 = #x000000000000000c
+	a = |main:a|
+	exit = #x00000001
+	result = (bvadd #xffffffff |main:a|)
+	v1 = #x00000001
+	v2 = |main:a|
+	v3 = (bvadd #x00000001 |main:a|)
+Symbolic variable values:
+	main:a -> #x00000000
+	
+[jnz] Exploring path for label 'end2'
+Halting executing
+Local variables:
+	A0 = #x0000000000000008
+	A1 = #x000000000000000c
+	a = |main:a|
+	exit = #x00000002
+	result = (bvadd #xffffffff |main:a|)
+	v1 = #x00000001
+	v2 = |main:a|
+	v3 = (bvadd #x00000001 |main:a|)
+Symbolic variable values:
+	main:a -> #x00000001
+	

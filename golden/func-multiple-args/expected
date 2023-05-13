@@ -6,8 +6,8 @@ Local variables:
 	c = (bvadd |main:a| |main:b|)
 	exit = #x00000001
 Symbolic variable values:
-	main:a -> #xfffffffd
-	main:b -> #x00000010
+	main:a -> #x00000010
+	main:b -> #xfffffffd
 	
 [jnz] Exploring path for label 'end2'
 Halting executing
@@ -17,6 +17,6 @@ Local variables:
 	c = (bvadd |main:a| |main:b|)
 	exit = #x00000002
 Symbolic variable values:
-	main:a -> #xfffffffe
-	main:b -> #x00000002
+	main:a -> #x00000002
+	main:b -> #xfffffffe
 	

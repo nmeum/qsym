@@ -139,7 +139,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         Ok(bv)
     }
 
-    fn exec_inst(&self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<BV<'ctx>, Error> {
+    fn exec_inst(&mut self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<BV<'ctx>, Error> {
         // XXX: This instruction simulator assumes that the instructions are
         // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
@@ -152,8 +152,32 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let addr = self.get_value(None, v)?;
                 Ok(self.state.mem.load_word(addr.simplify()))
             }
+            Instr::Alloc4(size) => {
+                let addr = self.state.stack_alloc(4, *size);
+                Ok(addr)
+            }
+            Instr::Alloc8(size) => {
+                let addr = self.state.stack_alloc(8, *size);
+                Ok(addr)
+            }
+            Instr::Alloc16(size) => {
+                let addr = self.state.stack_alloc(16, *size);
+                Ok(addr)
+            }
             _ => todo!(),
         }
+    }
+
+    fn exec_volatile(&mut self, instr: &VolatileInstr) -> Result<(), Error> {
+        match instr {
+            VolatileInstr::StoreWord(v, a) => {
+                let value = self.get_value(Some(BaseType::Word), v)?;
+                let addr = self.get_value(None, a)?;
+                self.state.mem.store_word(addr, value);
+            }
+        }
+
+        Ok(())
     }
 
     fn exec_stat(&mut self, stat: &'src Statement) -> Result<(), Error> {
@@ -161,6 +185,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             Statement::Assign(dest, base, inst) => {
                 let result = self.exec_inst(Some(*base), &inst)?;
                 self.state.add_local(dest, result);
+            }
+            Statement::Volatile(instr) => {
+                self.exec_volatile(instr)?;
             }
             Statement::Call(dest, _ty, fname, params) => {
                 let values = self.lookup_params(params)?;

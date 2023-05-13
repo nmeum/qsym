@@ -21,11 +21,15 @@ const FUNC_PATTERN: u32 = 0xdeadbeef;
 struct FuncState<'ctx, 'src> {
     labels: HashMap<&'src str, &'src Block>,
     local: HashMap<&'src str, BV<'ctx>>,
+
+    // Value of the stack pointer when this stack frame was created.
+    stkptr: BV<'ctx>,
 }
 
 pub struct State<'ctx, 'src> {
     v: ValueFactory<'ctx>,
     pub mem: Memory<'ctx>,
+    pub stkptr: BV<'ctx>,
 
     func: HashMap<&'src str, (BV<'ctx>, &'src FuncDef)>,
     data: HashMap<&'src str, (BV<'ctx>, &'src DataDef)>,
@@ -37,8 +41,10 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         ctx: &'ctx Context,
         source: &'src Vec<Definition>,
     ) -> Result<State<'ctx, 'src>, Error> {
+        let v = ValueFactory::new(ctx);
         let mut state = State {
-            v: ValueFactory::new(ctx),
+            stkptr: v.make_long(0),
+            v,
 
             func: HashMap::new(),
             data: HashMap::new(),
@@ -61,6 +67,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
             }
         }
 
+        state.stkptr = data_end_ptr;
         Ok(state)
     }
 
@@ -173,6 +180,20 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         Some(self.func.get(name)?.1)
     }
 
+    pub fn stack_alloc(&mut self, align: u64, size: u64) -> BV<'ctx> {
+        assert!(self.stck.len() != 0);
+
+        // (addr - (addr % alignment)) + alignment
+        let aligned_addr = self
+            .stkptr
+            .bvsub(&self.stkptr.bvurem(&self.v.make_long(align)))
+            .bvadd(&self.v.make_long(align));
+        self.stkptr = aligned_addr.bvadd(&self.v.make_long(size));
+
+        assert!(aligned_addr.get_size() == LONG_SIZE);
+        aligned_addr.clone()
+    }
+
     /////
     // Function-local operations
     /////
@@ -182,6 +203,7 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         let state = FuncState {
             labels: HashMap::from_iter(blocks),
             local: HashMap::new(),
+            stkptr: self.stkptr.clone(),
         };
 
         self.stck.push(state);
@@ -205,7 +227,8 @@ impl<'ctx, 'src> State<'ctx, 'src> {
     }
 
     pub fn pop_func(&mut self) {
-        self.stck.pop().unwrap();
+        let func = self.stck.pop().unwrap();
+        self.stkptr = func.stkptr;
     }
 
     // TODO: Remove this
