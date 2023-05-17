@@ -1,0 +1,20 @@
+[jnz] Exploring path for label 'end1'
+Halting executing
+Local variables:
+	a = (bvadd #x00000005 |main:a|)
+	b = #x0000002a
+	exit = #x00000001
+	r = (ite (= |main:a| #x00000025) #x00000001 #x00000000)
+Symbolic variable values:
+	main:a -> #x00000025
+	
+[jnz] Exploring path for label 'end2'
+Halting executing
+Local variables:
+	a = (bvadd #x00000005 |main:a|)
+	b = #x0000002a
+	exit = #x00000002
+	r = (ite (= |main:a| #x00000025) #x00000001 #x00000000)
+Symbolic variable values:
+	main:a -> #x00000000
+	

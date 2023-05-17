@@ -144,13 +144,39 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         Ok(bv)
     }
 
-    fn exec_inst(&mut self, dest_ty: Option<BaseType>, inst: &Instr) -> Result<BV<'ctx>, Error> {
+    fn perform_compare(
+        &self,
+        dest_ty: BaseType,
+        op: &CmpOp,
+        bv1: BV<'ctx>,
+        bv2: BV<'ctx>,
+    ) -> BV<'ctx> {
+        let cond = match op {
+            CmpOp::Eq => bv1._eq(&bv2),
+            CmpOp::Ne => bv1._eq(&bv2).not(),
+            CmpOp::Sle => bv1.bvsle(&bv2),
+            CmpOp::Slt => bv1.bvslt(&bv2),
+            CmpOp::Sge => bv1.bvsgt(&bv2),
+            CmpOp::Sgt => bv1.bvsgt(&bv2),
+            CmpOp::Ule => bv1.bvule(&bv2),
+            CmpOp::Ult => bv1.bvult(&bv2),
+            CmpOp::Uge => bv1.bvuge(&bv2),
+            CmpOp::Ugt => bv1.bvugt(&bv2),
+        };
+
+        let true_bv = self.v.from_base_u64(dest_ty, 1);
+        let false_bv = self.v.from_base_u64(dest_ty, 0);
+
+        cond.ite(&true_bv, &false_bv)
+    }
+
+    fn exec_inst(&mut self, dest_ty: BaseType, inst: &Instr) -> Result<BV<'ctx>, Error> {
         // XXX: This instruction simulator assumes that the instructions are
         // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
             Instr::Add(v1, v2) => {
-                let bv1 = self.get_value(dest_ty, v1)?;
-                let bv2 = self.get_value(dest_ty, v2)?;
+                let bv1 = self.get_value(Some(dest_ty), v1)?;
+                let bv2 = self.get_value(Some(dest_ty), v2)?;
                 Ok(bv1.bvadd(&bv2))
             }
             Instr::LoadWord(v) => {
@@ -168,6 +194,11 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             Instr::Alloc16(size) => {
                 let addr = self.state.stack_alloc(16, *size);
                 Ok(addr)
+            }
+            Instr::Compare(ty, op, v1, v2) => {
+                let bv1 = self.get_value(Some(*ty), v1)?;
+                let bv2 = self.get_value(Some(*ty), v2)?;
+                Ok(self.perform_compare(dest_ty, op, bv1, bv2))
             }
             _ => todo!(),
         }
@@ -188,7 +219,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     fn exec_stat(&mut self, stat: &'src Statement) -> Result<(), Error> {
         match stat {
             Statement::Assign(dest, base, inst) => {
-                let result = self.exec_inst(Some(*base), &inst)?;
+                let result = self.exec_inst(*base, &inst)?;
                 self.state.add_local(dest, result);
             }
             Statement::Volatile(instr) => {
