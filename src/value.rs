@@ -49,6 +49,15 @@ impl<'ctx> ValueFactory<'ctx> {
         }
     }
 
+    pub fn loadty_to_size(ty: LoadType) -> u32 {
+        match ty {
+            LoadType::Base(x) => Self::basety_to_size(x),
+            LoadType::SubWordType(x) => Self::subwty_to_size(x),
+            LoadType::SignedWord => 32,
+            LoadType::UnsignedWord => 32,
+        }
+    }
+
     ////
     // Bitvector Factory Functions
     ////
@@ -95,6 +104,41 @@ impl<'ctx> ValueFactory<'ctx> {
 
         let uncons = BV::fresh_const(self.ctx, "undef-msbsw", rem);
         val.concat(&uncons) // TODO: Does this set the MSB?
+    }
+
+    pub fn cast_to(&self, ty: ExtType, val: BV<'ctx>) -> BV<'ctx> {
+        let cur_size = val.get_size();
+        let tgt_size = Self::extty_to_size(ty);
+
+        if tgt_size == cur_size {
+            val
+        } else if tgt_size > cur_size {
+            val.zero_ext(tgt_size - cur_size)
+        } else {
+            val.extract(tgt_size - 1, 0)
+        }
+    }
+
+    pub fn sign_ext_to(&self, ty: BaseType, val: BV<'ctx>) -> BV<'ctx> {
+        let cur_size = val.get_size();
+        let tgt_size = Self::basety_to_size(ty);
+        if cur_size == tgt_size {
+            return val;
+        }
+
+        assert!(tgt_size > cur_size);
+        val.sign_ext(tgt_size - cur_size)
+    }
+
+    pub fn zero_ext_to(&self, ty: BaseType, val: BV<'ctx>) -> BV<'ctx> {
+        let cur_size = val.get_size();
+        let tgt_size = Self::basety_to_size(ty);
+        if cur_size == tgt_size {
+            return val;
+        }
+
+        assert!(tgt_size > cur_size);
+        val.zero_ext(tgt_size - cur_size)
     }
 
     ////

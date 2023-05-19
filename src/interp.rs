@@ -179,9 +179,24 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let bv2 = self.get_value(Some(dest_ty), v2)?;
                 Ok(bv1.bvadd(&bv2))
             }
-            Instr::LoadWord(v) => {
-                let addr = self.get_value(None, v)?;
-                Ok(self.state.mem.load_word(addr.simplify()))
+            Instr::Load(ty, a) => {
+                let size = ValueFactory::loadty_to_size(*ty);
+                assert!(size % 8 == 0);
+                let addr = self.get_value(None, a)?;
+                let value = self.state.mem.load_bitvector(addr, size as u64 / 8);
+
+                // For types smaller than long, two variants of the load
+                // instruction are available: one will sign extend the
+                // loaded value, while the other will zero extend it.
+                if size < LONG_SIZE {
+                    if ty.is_signed() {
+                        Ok(self.v.sign_ext_to(dest_ty, value))
+                    } else {
+                        Ok(self.v.zero_ext_to(dest_ty, value))
+                    }
+                } else {
+                    Ok(value)
+                }
             }
             Instr::Alloc4(size) => {
                 let addr = self.state.stack_alloc(4, *size);
@@ -206,10 +221,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
     fn exec_volatile(&mut self, instr: &VolatileInstr) -> Result<(), Error> {
         match instr {
-            VolatileInstr::StoreWord(v, a) => {
-                let value = self.get_value(Some(BaseType::Word), v)?;
+            VolatileInstr::Store(ty, v, a) => {
+                let value = self.get_value(None, v)?;
                 let addr = self.get_value(None, a)?;
-                self.state.mem.store_word(addr, value);
+                self.state
+                    .mem
+                    .store_bitvector(addr, self.v.cast_to(*ty, value));
             }
         }
 
