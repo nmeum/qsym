@@ -125,6 +125,13 @@ impl<'ctx> ValueFactory<'ctx> {
         }
     }
 
+    pub fn trunc_to(&self, ty: SubLongType, val: BV<'ctx>) -> BV<'ctx> {
+        let tgt_size = Self::sublty_to_size(ty);
+        let r = val.extract(tgt_size - 1, 0);
+        assert!(r.get_size() == tgt_size);
+        r
+    }
+
     pub fn sign_ext_to(&self, ty: BaseType, val: BV<'ctx>) -> BV<'ctx> {
         let cur_size = val.get_size();
         let tgt_size = Self::basety_to_size(ty);

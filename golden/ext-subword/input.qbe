@@ -1,0 +1,8 @@
+function $main(w %a) {
+@start
+	%.1 =l alloc4 2
+	storeh 255, %.1
+	%.2 =w loaduh %.1
+	%.3 =w extsb %.2
+	hlt
+}

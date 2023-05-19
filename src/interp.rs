@@ -215,6 +215,15 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let bv2 = self.get_value(Some(*ty), v2)?;
                 Ok(self.perform_compare(dest_ty, op, bv1, bv2))
             }
+            Instr::Ext(ty, v) => {
+                let bv = self.get_value(None, v)?;
+                let to_type = self.v.trunc_to(*ty, bv);
+                if ty.is_signed() {
+                    Ok(self.v.sign_ext_to(dest_ty, to_type))
+                } else {
+                    Ok(self.v.zero_ext_to(dest_ty, to_type))
+                }
+            },
             _ => todo!(),
         }
     }

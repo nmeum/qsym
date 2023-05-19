@@ -1,0 +1,8 @@
+Halting executing
+Local variables:
+	.1 = #x0000000000000008
+	.2 = #x000000ff
+	.3 = #xffffffff
+	a = |main:a|
+Symbolic variable values:
+	
