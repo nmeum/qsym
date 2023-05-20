@@ -3,6 +3,7 @@
 cd "$(dirname "$0")"
 . common.sh
 
+ret=0
 for test in *; do
 	[ -d "${test}" ] || continue
 
@@ -13,7 +14,10 @@ for test in *; do
 		cmp - "${test}/expected" 2>/dev/null 1>&2
 	if [ $? -ne 0 ]; then
 		echo FAIL
+		ret=1
 	else
 		echo OK
 	fi
 done
+
+exit "${ret}"
