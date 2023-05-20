@@ -49,12 +49,18 @@ impl<'ctx> ValueFactory<'ctx> {
         }
     }
 
+    fn sublty_to_size(ty: SubLongType) -> u32 {
+        match ty {
+            SubLongType::SubWord(x) => Self::subwty_to_size(x),
+            SubLongType::UnsignedWord => 32,
+            SubLongType::SignedWord => 32,
+        }
+    }
+
     pub fn loadty_to_size(ty: LoadType) -> u32 {
         match ty {
             LoadType::Base(x) => Self::basety_to_size(x),
-            LoadType::SubWordType(x) => Self::subwty_to_size(x),
-            LoadType::SignedWord => 32,
-            LoadType::UnsignedWord => 32,
+            LoadType::SubLong(x) => Self::sublty_to_size(x),
         }
     }
 
