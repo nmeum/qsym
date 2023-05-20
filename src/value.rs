@@ -78,6 +78,11 @@ impl<'ctx> ValueFactory<'ctx> {
         BV::from_i64(self.ctx, v, size)
     }
 
+    pub fn from_subw(&self, ty: SubWordType, name: String) -> BV<'ctx> {
+        let size = Self::subwty_to_size(ty);
+        BV::new_const(self.ctx, name, size)
+    }
+
     pub fn from_base(&self, ty: BaseType, name: String) -> BV<'ctx> {
         let size = Self::basety_to_size(ty);
         BV::new_const(self.ctx, name, size)

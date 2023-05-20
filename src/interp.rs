@@ -62,6 +62,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     fn symbolic_type(&self, name: String, ty: &Type) -> BV<'ctx> {
         match ty {
             Type::Base(ty) => self.v.from_base(*ty, name),
+            Type::SubWordType(ty) => self.v.from_subw(*ty, name),
             _ => panic!("not implemented"),
         }
     }
@@ -223,7 +224,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 } else {
                     Ok(self.v.zero_ext_to(dest_ty, to_type))
                 }
-            },
+            }
             _ => todo!(),
         }
     }
