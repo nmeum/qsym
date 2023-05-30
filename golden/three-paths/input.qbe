@@ -1,0 +1,28 @@
+export
+function w $main(w %.1, w %.3) {
+@start.1
+	%.2 =l alloc4 4
+	storew %.1, %.2
+	%.4 =l alloc4 4
+	storew %.3, %.4
+	%.5 =l alloc4 4
+@body.2
+	%.6 =w loadw %.2
+	%.7 =w loadw %.4
+	%.8 =w csltw %.6, %.7
+	jnz %.8, @if_true.3, @if_false.4
+@if_true.3
+	%.9 =w loadw %.2
+	%.10 =w csltw %.9, 5
+	jnz %.10, @if_true.5, @if_false.6
+@if_true.5
+	ret 3
+@if_false.6
+	ret 2
+@if_join.7
+	jmp @if_join.8
+@if_false.4
+	ret 1
+@if_join.8
+	ret 0
+}

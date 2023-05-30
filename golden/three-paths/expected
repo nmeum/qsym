@@ -1,0 +1,47 @@
+[jnz] Exploring path for label 'if_true.3'
+[jnz] Exploring path for label 'if_true.5'
+Local variables:
+	.1 = |main:.1|
+	.10 = (ite (bvsle #x00000005 |main:.1|) #x00000000 #x00000001)
+	.2 = #x0000000000000008
+	.3 = |main:.3|
+	.4 = #x0000000000000010
+	.5 = #x0000000000000018
+	.6 = |main:.1|
+	.7 = |main:.3|
+	.8 = (ite (bvsle |main:.3| |main:.1|) #x00000000 #x00000001)
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000000
+	main:.3 -> #x40000002
+	
+[jnz] Exploring path for label 'if_false.6'
+Local variables:
+	.1 = |main:.1|
+	.10 = (ite (bvsle #x00000005 |main:.1|) #x00000000 #x00000001)
+	.2 = #x0000000000000008
+	.3 = |main:.3|
+	.4 = #x0000000000000010
+	.5 = #x0000000000000018
+	.6 = |main:.1|
+	.7 = |main:.3|
+	.8 = (ite (bvsle |main:.3| |main:.1|) #x00000000 #x00000001)
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x40000000
+	main:.3 -> #x40000002
+	
+[jnz] Exploring path for label 'if_false.4'
+Local variables:
+	.1 = |main:.1|
+	.2 = #x0000000000000008
+	.3 = |main:.3|
+	.4 = #x0000000000000010
+	.5 = #x0000000000000018
+	.6 = |main:.1|
+	.7 = |main:.3|
+	.8 = (ite (bvsle |main:.3| |main:.1|) #x00000000 #x00000001)
+Symbolic variable values:
+	main:.1 -> #xc0000000
+	main:.3 -> #x80000002
+	
