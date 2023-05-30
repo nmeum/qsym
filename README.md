@@ -9,6 +9,7 @@ This enables qsym to reason about conditional jumps in the QBE IL, exploring bot
 qsym is in very early stages of development and presently mostly a proof-of-concept.
 The underlying parser for the QBE IL ([qbe-reader][qbe-reader github]) is also not yet complete, hence it does not support every syntactically valid QBE IL input yet.
 Furthermore, it is assumed that input programs are well typed, e.g. no type checks are performed for instruction arguments.
+Simple programs generated using a QBE frontend (e.g. [cproc][cproc repo]) can already be explored.
 
 ### Installation
 
@@ -73,3 +74,4 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 [z3 web]: https://github.com/Z3Prover/z3
 [smt wikipedia]: https://en.wikipedia.org/wiki/Satisfiability_modulo_theories
 [qbe-reader github]: https://github.com/nmeum/qbe-reader
+[cproc repo]: https://sr.ht/~mcf/cproc
