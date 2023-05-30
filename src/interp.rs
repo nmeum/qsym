@@ -171,15 +171,26 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         cond.ite(&true_bv, &false_bv)
     }
 
+    pub fn perform_binop<F>(
+        &self,
+        dest_ty: BaseType,
+        op: F,
+        o1: &Value,
+        o2: &Value,
+    ) -> Result<BV<'ctx>, Error>
+    where
+        F: Fn(&BV<'ctx>, &BV<'ctx>) -> BV<'ctx>,
+    {
+        let bv1 = self.get_value(Some(dest_ty), o1)?;
+        let bv2 = self.get_value(Some(dest_ty), o2)?;
+        Ok(op(&bv1, &bv2))
+    }
+
     fn exec_inst(&mut self, dest_ty: BaseType, inst: &Instr) -> Result<BV<'ctx>, Error> {
         // XXX: This instruction simulator assumes that the instructions are
         // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
-            Instr::Add(v1, v2) => {
-                let bv1 = self.get_value(Some(dest_ty), v1)?;
-                let bv2 = self.get_value(Some(dest_ty), v2)?;
-                Ok(bv1.bvadd(&bv2))
-            }
+            Instr::Add(v1, v2) => self.perform_binop(dest_ty, BV::bvadd, v1, v2),
             Instr::Load(ty, a) => {
                 let size = ValueFactory::loadty_to_size(*ty);
                 assert!(size % 8 == 0);
