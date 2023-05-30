@@ -191,6 +191,10 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         // well-typed. If not, this causes dubious assertion failures everywhere.
         match inst {
             Instr::Add(v1, v2) => self.perform_binop(dest_ty, BV::bvadd, v1, v2),
+            Instr::Sub(v1, v2) => self.perform_binop(dest_ty, BV::bvsub, v1, v2),
+            Instr::Mul(v1, v2) => self.perform_binop(dest_ty, BV::bvmul, v1, v2),
+            Instr::Rem(v1, v2) => self.perform_binop(dest_ty, BV::bvsrem, v1, v2),
+            Instr::URem(v1, v2) => self.perform_binop(dest_ty, BV::bvurem, v1, v2),
             Instr::Load(ty, a) => {
                 let size = ValueFactory::loadty_to_size(*ty);
                 assert!(size % 8 == 0);
