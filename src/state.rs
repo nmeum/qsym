@@ -184,7 +184,8 @@ impl<'ctx, 'src> State<'ctx, 'src> {
         self.stck.len()
     }
 
-    pub fn stack_alloc(&mut self, align: u64, size: u64) -> BV<'ctx> {
+    pub fn stack_alloc(&mut self, align: u8, size: u64) -> BV<'ctx> {
+        let align = align as u64;
         assert!(self.stck.len() != 0);
 
         // (addr - (addr % alignment)) + alignment

@@ -199,16 +199,8 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                     Ok(value)
                 }
             }
-            Instr::Alloc4(size) => {
-                let addr = self.state.stack_alloc(4, *size);
-                Ok(addr)
-            }
-            Instr::Alloc8(size) => {
-                let addr = self.state.stack_alloc(8, *size);
-                Ok(addr)
-            }
-            Instr::Alloc16(size) => {
-                let addr = self.state.stack_alloc(16, *size);
+            Instr::Alloc(align, size) => {
+                let addr = self.state.stack_alloc(align.byte_align(), *size);
                 Ok(addr)
             }
             Instr::Compare(ty, op, v1, v2) => {
@@ -238,6 +230,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                     .mem
                     .store_bitvector(addr, self.v.cast_to(*ty, value));
             }
+            _ => todo!(),
         }
 
         Ok(())

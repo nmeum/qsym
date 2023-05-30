@@ -222,7 +222,7 @@ dependencies = [
 [[package]]
 name = "qbe_reader"
 version = "0.1.0"
-source = "git+https://git.8pit.net/qbe-reader.git#bf74fe4d6fb4866405be038ea9ae9bf7d394e3ab"
+source = "git+https://git.8pit.net/qbe-reader.git#eacc67a2dd646e96c8171f62a78f4a8796b7903e"
 dependencies = [
  "nom 7.1.3",
 ]
