@@ -1,0 +1,189 @@
+[jnz] Exploring path for label 'if_true.11'
+[jnz] Exploring path for label 'logic_right.13'
+[jnz] Exploring path for label 'for_body.4'
+[jnz] Exploring path for label 'if_true.7'
+[jnz] Exploring path for label 'if_false.16'
+Local variables:
+	.1 = |main:.1|
+	.10 = (ite (= |main:.1| #x00000002) #x00000001 #x00000000)
+	.11 = (ite (= |main:.1| #x00000002) #x00000001 #x00000000)
+	.12 = (ite (= |main:.1| #x00000002) #x00000001 #x00000000)
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = #x00000002
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000008
+	
+[jnz] Exploring path for label 'if_false.8'
+[jnz] Exploring path for label 'for_cond.3'
+[jnz] Exploring path for label 'for_body.4'
+[jnz] Exploring path for label 'if_true.7'
+[jnz] Exploring path for label 'if_false.16'
+Local variables:
+	.1 = |main:.1|
+	.10 = (ite (= |main:.1| #x00000003) #x00000001 #x00000000)
+	.11 = (ite (= |main:.1| #x00000003) #x00000001 #x00000000)
+	.12 = (ite (= |main:.1| #x00000003) #x00000001 #x00000000)
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = #x00000003
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000009
+	
+[jnz] Exploring path for label 'if_false.8'
+[jnz] Exploring path for label 'for_cond.3'
+[jnz] Exploring path for label 'for_body.4'
+[jnz] Exploring path for label 'if_false.8'
+[jnz] Exploring path for label 'for_cond.3'
+[jnz] Exploring path for label 'for_body.4'
+[jnz] Exploring path for label 'if_false.8'
+[jnz] Exploring path for label 'for_cond.3'
+[jnz] Exploring path for label 'for_body.4'
+[jnz] Exploring path for label 'if_false.8'
+[jnz] Exploring path for label 'for_cond.3'
+[jnz] Exploring path for label 'for_join.6'
+[jnz] Exploring path for label 'if_true.15'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	.10 = #x00000001
+	.11 = #x00000001
+	.12 = #x00000001
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = |main:.1|
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000007
+	
+[jnz] Exploring path for label 'for_join.6'
+[jnz] Exploring path for label 'if_true.15'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	.10 = #x00000001
+	.11 = #x00000001
+	.12 = #x00000001
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = |main:.1|
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000005
+	
+[jnz] Exploring path for label 'for_join.6'
+[jnz] Exploring path for label 'if_true.15'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	.10 = #x00000001
+	.11 = #x00000001
+	.12 = #x00000001
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = |main:.1|
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000003
+	
+[jnz] Exploring path for label 'for_join.6'
+[jnz] Exploring path for label 'if_true.15'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	.10 = #x00000001
+	.11 = #x00000001
+	.12 = #x00000001
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+	.7 = |main:.1|
+	.8 = |main:.1|
+	.9 = |main:.1|
+Symbolic variable values:
+	main:.1 -> #x00000002
+	
+[jnz] Exploring path for label 'logic_join.14'
+[jnz] Exploring path for label 'if_false.16'
+Local variables:
+	.1 = |main:.1|
+	.12 = #x00000000
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+	.5 = |main:.1|
+	.6 = (ite (= ((_ extract 31 1) |main:.1|) #b0000000000000000000000000000000)
+     #x00000000
+     #x00000001)
+Symbolic variable values:
+	main:.1 -> #x00000000
+	
+[jnz] Exploring path for label 'if_false.12'
+Local variables:
+	.1 = |main:.1|
+	.2 = #x000000000000000c
+	.3 = |main:.1|
+	.4 = (ite (and (= ((_ extract 31 4) |main:.1|) #x0000000)
+          (bvule ((_ extract 3 0) |main:.1|) #xa))
+     #x00000001
+     #x00000000)
+Symbolic variable values:
+	main:.1 -> #x0000000c
+	
