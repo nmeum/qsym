@@ -1,0 +1,12 @@
+function w $main(w %a) {
+@start
+        jnz %a, @l1, @l1
+@l1
+        jmp @phi
+@l2
+        jmp @phi
+@phi
+	%res =w phi @l1 1, @l2 2
+@end
+        hlt
+}

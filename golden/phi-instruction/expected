@@ -1,0 +1,18 @@
+[jnz] Exploring path for label 'l1'
+[jnz] Exploring path for label 'phi'
+Halting executing
+Local variables:
+	a = |main:a|
+	res = #x00000001
+Symbolic variable values:
+	main:a -> #x00000002
+	
+[jnz] Exploring path for label 'l1'
+[jnz] Exploring path for label 'phi'
+Halting executing
+Local variables:
+	a = |main:a|
+	res = #x00000001
+Symbolic variable values:
+	main:a -> #x00000000
+	
