@@ -320,16 +320,39 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<BlockReturn<'ctx>, Error> {
+    fn explore_path(
+        &mut self,
+        prev_label: &'src str,
+        path: &Path<'ctx, 'src>,
+    ) -> Result<BlockReturn<'ctx>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
             self.solver.assert(c);
         }
-        self.exec_block(path.1)
+        self.exec_block(Some(prev_label), path.1)
     }
 
-    fn exec_block(&mut self, block: &'src Block) -> Result<BlockReturn<'ctx>, Error> {
+    fn exec_block(
+        &mut self,
+        prev_label: Option<&'src str>,
+        block: &'src Block,
+    ) -> Result<BlockReturn<'ctx>, Error> {
+        for phi in block.phi.iter() {
+            match prev_label {
+                Some(label) => {
+                    let val = phi
+                        .labels
+                        .get(label)
+                        .ok_or(Error::UnknownLabel(label.to_string()))?;
+
+                    let bv = self.get_value(Some(phi.base_type), val)?;
+                    self.state.add_local(&phi.ident, bv);
+                }
+                None => return Err(Error::PhiAtFuncStart),
+            }
+        }
+
         for stat in block.inst.iter() {
             self.exec_stat(stat)?;
         }
@@ -350,7 +373,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let pid = fork();
                 match pid {
                     -1 => Err(Error::ForkFailed),
-                    0 => self.explore_path(&path1),
+                    0 => self.explore_path(&block.label, &path1),
                     _ => {
                         let mut status = 0 as c_int;
                         if waitpid(pid, &mut status as *mut c_int, 0) == -1 {
@@ -359,12 +382,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                             if status != 0 {
                                 exit(status);
                             }
-                            self.explore_path(&path2)
+                            self.explore_path(&block.label, &path2)
                         }
                     }
                 }
             },
-            FuncReturn::Jump(path) => self.explore_path(&path),
+            FuncReturn::Jump(path) => self.explore_path(&block.label, &path),
             FuncReturn::Return(value) => {
                 // TODO: Treat return from entry point function like `hlt` for now.
                 if self.state.stack_size() == 1 {
@@ -392,8 +415,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             self.state.add_local(name, bv);
         }
 
+        let mut prev_label: Option<&'src str> = None;
         for block in func.body.iter() {
-            match self.exec_block(block) {
+            let ret = self.exec_block(prev_label, block);
+            prev_label = Some(&block.label);
+
+            match ret {
                 Err(Error::HaltExecution) => {
                     self.dump();
                     return Ok(None);

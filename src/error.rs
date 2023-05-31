@@ -10,4 +10,5 @@ pub enum Error {
     UnsupportedStringType,
     InvalidCall,
     MissingJump,
+    PhiAtFuncStart,
 }
