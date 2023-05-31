@@ -1,6 +1,7 @@
 use libc::{c_int, fork, waitpid};
 use qbe_reader::types::*;
 use qbe_reader::Definition;
+use std::process::exit;
 
 use z3::{
     ast::{Ast, Bool, BV},
@@ -355,6 +356,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                         if waitpid(pid, &mut status as *mut c_int, 0) == -1 {
                             Err(Error::WaitpidFailed)
                         } else {
+                            if status != 0 {
+                                exit(status);
+                            }
                             self.explore_path(&path2)
                         }
                     }
