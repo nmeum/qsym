@@ -16,6 +16,9 @@ pub struct Interp<'ctx, 'src> {
     v: ValueFactory<'ctx>,
     state: State<'ctx, 'src>,
     solver: z3::Solver<'ctx>,
+
+    // Primitive control-flow tracking for PHI instructions.
+    prev_label: Option<&'src str>,
 }
 
 struct Path<'ctx, 'src>(Option<Bool<'ctx>>, &'src Block);
@@ -57,6 +60,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             v: ValueFactory::new(ctx),
             state: state,
             solver: z3::Solver::new(&ctx),
+            prev_label: None,
         })
     }
 
@@ -330,26 +334,18 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
     }
 
     #[inline]
-    fn explore_path(
-        &mut self,
-        prev_label: &'src str,
-        path: &Path<'ctx, 'src>,
-    ) -> Result<BlockReturn<'ctx, 'src>, Error> {
+    fn explore_path(&mut self, path: &Path<'ctx, 'src>) -> Result<BlockReturn<'ctx, 'src>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
             self.solver.assert(c);
         }
-        self.exec_block(Some(prev_label), path.1)
+        self.exec_block(path.1)
     }
 
-    fn exec_block(
-        &mut self,
-        prev_label: Option<&'src str>,
-        block: &'src Block,
-    ) -> Result<BlockReturn<'ctx, 'src>, Error> {
+    fn exec_block(&mut self, block: &'src Block) -> Result<BlockReturn<'ctx, 'src>, Error> {
         for phi in block.phi.iter() {
-            match prev_label {
+            match self.prev_label {
                 Some(label) => {
                     let val = phi
                         .labels
@@ -373,6 +369,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         };
 
         let targets = self.exec_jump(jump)?;
+        self.prev_label = Some(&block.label);
         match targets {
             // For conditional jumps, we fork(3) the entire interpreter process.
             // This is, obviously, horribly inefficient and will lead to memory
@@ -383,7 +380,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                 let pid = fork();
                 match pid {
                     -1 => Err(Error::ForkFailed),
-                    0 => self.explore_path(&block.label, &path1),
+                    0 => self.explore_path(&path1),
                     _ => {
                         let mut status = 0 as c_int;
                         if waitpid(pid, &mut status as *mut c_int, 0) == -1 {
@@ -392,12 +389,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                             if status != 0 {
                                 exit(status);
                             }
-                            self.explore_path(&block.label, &path2)
+                            self.explore_path(&path2)
                         }
                     }
                 }
             },
-            FuncReturn::Jump(path) => self.explore_path(&block.label, &path),
+            FuncReturn::Jump(path) => self.explore_path(&path),
             FuncReturn::Return(value) => {
                 // TODO: Treat return from entry point function like `hlt` for now.
                 if self.state.stack_size() == 1 {
@@ -425,16 +422,12 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             self.state.add_local(name, bv);
         }
 
-        let mut prev_label: Option<&'src str> = None;
         let mut block = func.body.first();
         while block.is_some() {
             // .unwrap() won't panic due to loop condition.
             let cur_block = block.unwrap();
 
-            let ret = self.exec_block(prev_label, cur_block);
-            prev_label = Some(&cur_block.label);
-
-            match ret {
+            match self.exec_block(cur_block) {
                 Err(Error::HaltExecution) => {
                     self.dump();
                     return Ok(None);
@@ -449,7 +442,9 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                         let mut it = func.body.iter();
                         let cur = it.find(|b| b.label == label);
                         assert!(cur.is_some() && cur.unwrap().label == label);
+
                         block = it.next();
+                        self.prev_label = Some(label);
                         continue;
                     }
                 },
