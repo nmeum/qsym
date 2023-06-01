@@ -26,9 +26,9 @@ enum FuncReturn<'ctx, 'src> {
     Return(Option<BV<'ctx>>),
 }
 
-enum BlockReturn<'ctx> {
+enum BlockReturn<'ctx, 'src> {
     Value(Option<BV<'ctx>>),
-    Fallthrough,
+    Fallthrough(&'src str), // Block label to fall through from
 }
 
 impl<'ctx, 'src> Path<'ctx, 'src> {
@@ -334,7 +334,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         &mut self,
         prev_label: &'src str,
         path: &Path<'ctx, 'src>,
-    ) -> Result<BlockReturn<'ctx>, Error> {
+    ) -> Result<BlockReturn<'ctx, 'src>, Error> {
         println!("[jnz] Exploring path for label '{}'", path.1.label);
 
         if let Some(c) = &path.0 {
@@ -347,7 +347,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         &mut self,
         prev_label: Option<&'src str>,
         block: &'src Block,
-    ) -> Result<BlockReturn<'ctx>, Error> {
+    ) -> Result<BlockReturn<'ctx, 'src>, Error> {
         for phi in block.phi.iter() {
             match prev_label {
                 Some(label) => {
@@ -369,7 +369,7 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
 
         let jump = match &block.jump {
             Some(x) => x,
-            None => return Ok(BlockReturn::Fallthrough),
+            None => return Ok(BlockReturn::Fallthrough(&block.label)),
         };
 
         let targets = self.exec_jump(jump)?;
@@ -426,9 +426,13 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
         }
 
         let mut prev_label: Option<&'src str> = None;
-        for block in func.body.iter() {
-            let ret = self.exec_block(prev_label, block);
-            prev_label = Some(&block.label);
+        let mut block = func.body.first();
+        while block.is_some() {
+            // .unwrap() won't panic due to loop condition.
+            let cur_block = block.unwrap();
+
+            let ret = self.exec_block(prev_label, cur_block);
+            prev_label = Some(&cur_block.label);
 
             match ret {
                 Err(Error::HaltExecution) => {
@@ -441,7 +445,13 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                         self.state.pop_func();
                         return Ok(v);
                     }
-                    BlockReturn::Fallthrough => continue,
+                    BlockReturn::Fallthrough(label) => {
+                        let mut it = func.body.iter();
+                        let cur = it.find(|b| b.label == label);
+                        assert!(cur.is_some() && cur.unwrap().label == label);
+                        block = it.next();
+                        continue;
+                    }
                 },
             }
         }

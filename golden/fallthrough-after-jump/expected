@@ -1,0 +1,16 @@
+[jnz] Exploring path for label 'a'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	ret = #x00000001
+Symbolic variable values:
+	main:.1 -> #x00000002
+	
+[jnz] Exploring path for label 'b'
+Halting executing
+Local variables:
+	.1 = |main:.1|
+	ret = #x00000002
+Symbolic variable values:
+	main:.1 -> #x00000000
+	
