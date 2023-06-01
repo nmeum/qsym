@@ -194,8 +194,19 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
             Instr::Add(v1, v2) => self.perform_binop(dest_ty, BV::bvadd, v1, v2),
             Instr::Sub(v1, v2) => self.perform_binop(dest_ty, BV::bvsub, v1, v2),
             Instr::Mul(v1, v2) => self.perform_binop(dest_ty, BV::bvmul, v1, v2),
+            Instr::UDiv(v1, v2) => self.perform_binop(dest_ty, BV::bvudiv, v1, v2),
             Instr::Rem(v1, v2) => self.perform_binop(dest_ty, BV::bvsrem, v1, v2),
             Instr::URem(v1, v2) => self.perform_binop(dest_ty, BV::bvurem, v1, v2),
+            Instr::Or(v1, v2) => self.perform_binop(dest_ty, BV::bvor, v1, v2),
+            Instr::Xor(v1, v2) => self.perform_binop(dest_ty, BV::bvxor, v1, v2),
+            Instr::And(v1, v2) => self.perform_binop(dest_ty, BV::bvand, v1, v2),
+            Instr::Sar(v1, v2) => self.perform_binop(dest_ty, BV::bvashr, v1, v2),
+            Instr::Shr(v1, v2) => self.perform_binop(dest_ty, BV::bvlshr, v1, v2),
+            Instr::Shl(v1, v2) => self.perform_binop(dest_ty, BV::bvshl, v1, v2),
+            Instr::Neg(val) => {
+                let bv = self.get_value(Some(dest_ty), val)?;
+                Ok(bv.bvneg())
+            }
             Instr::Load(ty, a) => {
                 let size = ValueFactory::loadty_to_size(*ty);
                 assert!(size % 8 == 0);
@@ -233,7 +244,6 @@ impl<'ctx, 'src> Interp<'ctx, 'src> {
                     Ok(self.v.zero_ext_to(dest_ty, to_type))
                 }
             }
-            _ => todo!(),
         }
     }
 
